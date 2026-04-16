@@ -173,14 +173,13 @@ pub(super) fn solo_config() -> ChainSpec {
     &devnet_genesis(
       &["Alice"],
       vec![
-        account_from_name("Alice"),
-        account_from_name("Bob"),
-        account_from_name("Charlie"),
-        account_from_name("Dave"),
-        account_from_name("Eve"),
-        account_from_name("Ferdie"),
+        insecure_account_from_name("Alice"),
+        insecure_account_from_name("Bob"),
+        insecure_account_from_name("Charlie"),
+        insecure_account_from_name("Dave"),
+        insecure_account_from_name("Eve"),
         // ferryswap test account
-        PublicKey::from_raw([
+        SeraiAddress([
           78, 8, 16, 157, 111, 15, 126, 163, 155, 125, 161, 74, 246, 71, 181, 89, 252, 91, 42, 241,
           182, 122, 43, 61, 42, 63, 64, 122, 199, 214, 8, 93,
         ]),
