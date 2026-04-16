@@ -178,6 +178,11 @@ pub(super) fn solo_config() -> ChainSpec {
         insecure_account_from_name("Charlie"),
         insecure_account_from_name("Dave"),
         insecure_account_from_name("Eve"),
+        // ferryswap test account
+        SeraiAddress([
+          78, 8, 16, 157, 111, 15, 126, 163, 155, 125, 161, 74, 246, 71, 181, 89, 252, 91, 42, 241,
+          182, 122, 43, 61, 42, 63, 64, 122, 199, 214, 8, 93,
+        ]),
       ],
     ),
   )
