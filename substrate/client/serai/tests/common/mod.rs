@@ -6,7 +6,7 @@ use zeroize::Zeroizing;
 use rand_core::OsRng;
 
 use ciphersuite::{group::GroupEncoding as _, GroupIo, WrappedGroup as _};
-use dkg_musig::{Participant, ThresholdKeys, musig};
+use musig::{Participant, ThresholdKeys, musig};
 use dalek_ff_group::Ristretto;
 use schnorrkel::Schnorrkel;
 
