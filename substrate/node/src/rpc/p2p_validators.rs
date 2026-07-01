@@ -1,3 +1,5 @@
+use sp_core::ByteArray;
+
 use super::*;
 
 pub(crate) fn module(
@@ -58,6 +60,28 @@ pub(crate) fn module(
     }
 
     Ok(all_p2p_addresses)
+  })?;
+
+  module.register_async_method("validators_for_peering", async move |params, context, _ext| {
+    let network = match params.parse::<[String; 1]>() {
+      Ok([network]) => network,
+      Err(e) => return Err(e),
+    };
+
+    let network = network_from_str(network)?;
+    let (_, client, _) = &*context;
+    let latest_block = client.info().best_hash;
+
+    // retrieve validators
+    let validators = client
+      .runtime_api()
+      .validators_for_peering(latest_block, network)
+      .map_err(|_| Error::Internal("couldn't get validators from the latest block"))?
+      .iter()
+      .map(|p| hex::encode(p.as_slice()))
+      .collect::<Vec<_>>();
+
+    Ok(validators)
   })?;
 
   Ok(module)

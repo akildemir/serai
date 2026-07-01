@@ -245,6 +245,20 @@ impl Serai {
       )
       .await
   }
+
+  /// Returns the validators for peering.
+  pub async fn validators_for_peering(&self, network: ExternalNetworkId) -> Result<Vec<String>, RpcError> {
+    self
+      .call(
+        "validators_for_peering",
+        match network {
+          ExternalNetworkId::Bitcoin => r#"["bitcoin"]"#,
+          ExternalNetworkId::Ethereum => r#"["ethereum"]"#,
+          ExternalNetworkId::Monero => r#"["monero"]"#,
+        },
+      )
+      .await
+  }
 }
 
 impl Events {

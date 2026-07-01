@@ -215,7 +215,7 @@ fn build_serai_service(
     We want to enable LLVM's SafeStack sanitizer, which is recommended for usage even with
     production binaries. It only supports the `x86_64-unknown-linux-gnu` target however.
 
-    We also want to enable LLVM's ASan as it's not expected to have false positives, errors upon
+        We also want to enable LLVM's ASan as it's not expected to have false positives, errors upon
     detection (so we'll notice it even within CI-instrumented containers which shut down once the
     test is already considered to have passed), but it's only recommended for non-production
     use-cases. For `linux` targets, it only supports `linux-gnu` though and only for certain hosts.
@@ -227,7 +227,7 @@ fn build_serai_service(
     by how this tool does not produce portable containers.
   */
   {
-    let (safestack, asan) = {
+    let safestack = {
       #[allow(unused)]
       let mut supports_safestack = false;
       #[cfg(target_arch = "x86_64")]
@@ -235,41 +235,10 @@ fn build_serai_service(
         supports_safestack = os == Os::Debian;
       }
 
-      #[allow(unused)]
-      let mut supports_asan = false;
-      #[cfg(any(target_arch = "x86_64", target_arch = "aarch64"))]
-      {
-        supports_asan = (!release) && (os == Os::Debian);
-      }
-
-      if supports_safestack && supports_asan {
-        /*
-          If both are supported, randomly choose one. This ensures both variants are tested with,
-          despite how we only intend to use one in production (not leaving a gap where we don't
-          test with SafeStack as desired in a production deployment).
-
-          TODO: Instead of passing around `Network, Os`, design and develop a `Profile` system
-          which consistently yields the configurations for all of these specific knobs. Right now,
-          we frequently re-decide whether or not to enable ASan. We should also replace `bool` with
-          `enum` for clairty.
-        */
-        supports_safestack = (OsRng.next_u64() & 1) == 1;
-        supports_asan = !supports_safestack;
-      }
-
-      (supports_safestack, supports_asan)
+      supports_safestack
     };
     if safestack {
       rustflags += " -Z sanitizer=safestack";
-    } else if asan {
-      /*
-        We use the system's ASan runtime, not the one Rust will want to link in, due to
-        instrumenting the allocator along with the Serai services themselves.
-
-        This does dynamically link to _all_ sanitizer runtimes, but the only sanitizer we
-        potentially use which requires a runtime is this one.
-      */
-      rustflags += " -Z sanitizer=address -Z external-clangrt -lasan";
     }
   }
 

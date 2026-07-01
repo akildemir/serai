@@ -43,12 +43,17 @@ impl OnlyValidators {
     // Write the hash of our challenge
     socket.write_all(&Blake2s256::digest(our_challenge)).await?;
 
+    // flush so the peer actually receives our commitment since they won't send their reveal
+    // until they have read it and we won't proceed until we've read theirs.
+    socket.flush().await?;
+
     // Read the hash of their challenge
     let mut their_challenge_commitment = [0; 32];
     socket.read_exact(&mut their_challenge_commitment).await?;
 
     // Reveal our challenge
     socket.write_all(&our_challenge).await?;
+    socket.flush().await?;
 
     // Read their challenge
     let mut their_challenge = [0; 32];
@@ -92,6 +97,9 @@ impl OnlyValidators {
     .unwrap();
     let signature = self.serai_key.sign_simple(PROTOCOL.as_bytes(), &msg);
     socket.write_all(&signature.to_bytes()).await?;
+
+    // flush so the peer receives our public key.
+    socket.flush().await?;
 
     let mut public_key_and_sig = [0; 96];
     socket.read_exact(&mut public_key_and_sig).await?;

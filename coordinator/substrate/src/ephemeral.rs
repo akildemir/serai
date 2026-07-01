@@ -123,7 +123,7 @@ impl<D: Db> ContinuallyRan for EphemeralEventStream<D> {
       // this at all.
       let mut set = FuturesOrdered::new();
       for block_number in
-        next_block ..= latest_finalized_block.min(next_block + BLOCKS_TO_SYNC_AT_ONCE)
+        next_block ..= latest_finalized_block.min(next_block + BLOCKS_TO_SYNC_AT_ONCE - 1)
       {
         set.push_back(scan(block_number));
       }
@@ -251,6 +251,8 @@ impl<D: Db> ContinuallyRan for EphemeralEventStream<D> {
           crate::SignSlashReport::send(&mut txn, set);
         }
 
+        // save next block to process
+        NextBlock::set(&mut txn, &(block_number + 1));
         txn.commit();
       }
 

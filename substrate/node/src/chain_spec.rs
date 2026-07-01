@@ -1,10 +1,11 @@
 use std::{sync::Arc, fs};
 
-use rand_core::OsRng;
+use rand_core::SeedableRng;
+use rand_chacha::ChaCha20Rng;
 use zeroize::Zeroizing;
 use ciphersuite::{
-  group::ff::{Field as _, PrimeField as _},
-  WrappedGroup,
+  group::ff::PrimeField as _,
+  WrappedGroup, WithPreferredHash,
 };
 use dalek_ff_group::Ristretto;
 use embedwards25519::Embedwards25519;
@@ -39,7 +40,7 @@ use sc_service::{ChainType, ChainSpec as _, GenericChainSpec as ChainSpec};
 ///
 /// Note the development seed itself is used as the _auxiliary key_ used to operate the node with.
 pub(super) fn validator_identity_for_dev_seed(dev_seed: &str) -> SeraiAddress {
-  Pair::from_seed(&sp_core::blake2_256(dev_seed.as_bytes())).public().into()
+  Pair::from_string(dev_seed, None).unwrap().public().into()
 }
 
 /// Create an insecure key pair from a name alone.
@@ -53,44 +54,56 @@ fn insecure_keypair_from_name(name: &'static str) -> Pair {
 ///
 /// This will have effectively no entropy and MUST NOT be used except for testing purposes.
 fn insecure_account_from_name(name: &'static str) -> SeraiAddress {
-  Pair::from_seed(&sp_core::blake2_256(format!("//{name}").as_bytes())).public().into()
+  insecure_keypair_from_name(name).public().into()
+}
+
+// This is for test only.
+fn insecure_arbitrary_key_from_name<C: WithPreferredHash>(name: &str) -> C::F {
+  C::hash_to_F(&[b"insecure arbitrary key".as_slice(), name.as_bytes()].concat())
 }
 
 /// Create a list of insecure auxiliary keys for the specified validator.
 fn insecure_auxiliary_keys(name: &'static str) -> Vec<SignedEmbeddedEllipticCurveKeys> {
   let validator = insecure_account_from_name(name);
-  vec![
-    SignedEmbeddedEllipticCurveKeys::serai(
-      &mut OsRng,
-      validator,
-      &Zeroizing::new(
-        <Ristretto as WrappedGroup>::F::from_repr(
-          insecure_keypair_from_name(name).to_raw_vec()[.. 32].try_into().unwrap(),
-        )
-        .unwrap(),
-      ),
+
+  // Seed a deterministic RNG from the validator's name so every node generates an identical set of
+  // auxiliary keys, using `OsRng` here would cause each node to produce distinct keys, yielding
+  // a genesis mismatch which prevents peering.
+  let mut rng =
+    ChaCha20Rng::from_seed(sp_core::blake2_256(format!("auxiliary-keys-//{name}").as_bytes()));
+
+  let serai = SignedEmbeddedEllipticCurveKeys::serai(
+    &mut rng,
+    validator,
+    &Zeroizing::new(
+      <Ristretto as WrappedGroup>::F::from_repr(
+        insecure_keypair_from_name(name).to_raw_vec()[.. 32].try_into().unwrap(),
+      )
+      .unwrap(),
     ),
-    SignedEmbeddedEllipticCurveKeys::bitcoin(
-      &mut OsRng,
-      validator,
-      &Zeroizing::new(<Embedwards25519 as WrappedGroup>::F::random(&mut OsRng)),
-      &Zeroizing::new(<Secq256k1 as WrappedGroup>::F::random(&mut OsRng)),
-    ),
-    SignedEmbeddedEllipticCurveKeys::ethereum(
-      &mut OsRng,
-      validator,
-      &Zeroizing::new(<Embedwards25519 as WrappedGroup>::F::random(&mut OsRng)),
-      &Zeroizing::new(<Secq256k1 as WrappedGroup>::F::random(&mut OsRng)),
-    ),
-    SignedEmbeddedEllipticCurveKeys::monero(
-      &mut OsRng,
-      validator,
-      &Zeroizing::new(<Embedwards25519 as WrappedGroup>::F::random(&mut OsRng)),
-    ),
-  ]
+  );
+
+  let bitcoin = {
+    let embedwards = Zeroizing::new(insecure_arbitrary_key_from_name::<Embedwards25519>(name));
+    let secq = Zeroizing::new(insecure_arbitrary_key_from_name::<Secq256k1>(name));
+    SignedEmbeddedEllipticCurveKeys::bitcoin(&mut rng, validator, &embedwards, &secq)
+  };
+
+  let ethereum = {
+    let embedwards = Zeroizing::new(insecure_arbitrary_key_from_name::<Embedwards25519>(name));
+    let secq = Zeroizing::new(insecure_arbitrary_key_from_name::<Secq256k1>(name));
+    SignedEmbeddedEllipticCurveKeys::ethereum(&mut rng, validator, &embedwards, &secq)
+  };
+
+  let monero = {
+    let embedwards = Zeroizing::new(insecure_arbitrary_key_from_name::<Embedwards25519>(name));
+    SignedEmbeddedEllipticCurveKeys::monero(&mut rng, validator, &embedwards)
+  };
+
+  vec![serai, bitcoin, ethereum, monero]
 }
 
-fn wasm_binary(dev: bool) -> Vec<u8> {
+fn wasm_binary(allow_builtin: bool) -> Vec<u8> {
   const DEFAULT_WASM_PATH: &str = "/runtime/serai.wasm";
   let path = serai_env::var("SERAI_WASM_PATH").unwrap_or(DEFAULT_WASM_PATH.to_owned());
   if let Ok(binary) = fs::read(&path) {
@@ -98,7 +111,7 @@ fn wasm_binary(dev: bool) -> Vec<u8> {
     return binary;
   }
 
-  assert!(dev, "could not read WASM for the runtime and this is not a dev network");
+  assert!(allow_builtin, "could not read WASM for the runtime and this is a public network");
 
   sp_tracing::info!("using built-in wasm");
   serai_runtime::WASM.to_vec()
@@ -134,7 +147,8 @@ fn genesis(
   protocol_id: &'static str,
   config: &GenesisConfig,
 ) -> ChainSpec {
-  let bin = wasm_binary(matches!(chain_type, ChainType::Development));
+  // permit the built-in WASM for all non-public(test) networks.
+  let bin = wasm_binary(!matches!(chain_type, ChainType::Live));
   let hash = sp_core::blake2_256(&bin).to_vec();
 
   let mut chain_spec = ChainSpecBuilder::new(&bin, None)

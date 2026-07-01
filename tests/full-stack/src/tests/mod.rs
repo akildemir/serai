@@ -3,7 +3,7 @@ use std::{sync::OnceLock, collections::HashMap};
 
 use tokio::sync::Mutex;
 
-use serai_client::primitives::ExternalNetworkId;
+use serai_client_serai::abi::primitives::network_id::ExternalNetworkId;
 
 use dockertest::{
   LogAction, LogPolicy, LogSource, LogOptions, StartPolicy, TestBodySpecification,
@@ -11,13 +11,14 @@ use dockertest::{
 };
 
 use serai_docker_tests::fresh_logs_folder;
-use serai_processor_tests::{network_instance, processor_instance};
-use serai_message_queue_tests::instance as message_queue_instance;
-use serai_coordinator_tests::{coordinator_instance, serai_composition};
 
 use crate::*;
+use instances::*;
 
-mod mint_and_burn;
+// mod mint_and_burn;
+mod run_network;
+// contains the copied functions from other modules.
+mod instances;
 
 pub(crate) const VALIDATORS: usize = 4;
 // pub(crate) const THRESHOLD: usize = ((VALIDATORS * 2) / 3) + 1;
@@ -43,6 +44,45 @@ pub(crate) async fn new_test(test_body: impl TestBody) {
   let mut all_handles = vec![];
   let mut test = DockerTest::new().with_network(dockertest::Network::Isolated);
   let mut coordinator_compositions = vec![];
+
+  // spawn a single Bitcoin and a single Monero node, shared by every validator's processor.
+  let (bitcoin_handle, bitcoin_port, monero_handle, monero_port) = {
+    let (first, unique_id) = {
+      let first = *unique_id_lock == 0;
+      let unique_id = *unique_id_lock;
+      *unique_id_lock += 1;
+      (first, unique_id)
+    };
+    let logs_path = fresh_logs_folder(first, "full-stack");
+
+    let (bitcoin_composition, bitcoin_port) = network_instance(ExternalNetworkId::Bitcoin);
+    let (monero_composition, monero_port) = network_instance(ExternalNetworkId::Monero);
+
+    let bitcoin_handle = format!("full_stack-bitcoin-{unique_id}");
+    let monero_handle = format!("full_stack-monero-{unique_id}");
+
+    for (handle, composition) in
+      [(&bitcoin_handle, bitcoin_composition), (&monero_handle, monero_composition)]
+    {
+      test.provide_container(
+        composition
+          .set_start_policy(StartPolicy::Strict)
+          .set_handle(handle.clone())
+          .set_log_options(Some(LogOptions {
+            action: if std::env::var("GITHUB_CI") == Ok("true".to_owned()) {
+              LogAction::Forward
+            } else {
+              LogAction::ForwardToFile { path: logs_path.clone() }
+            },
+            policy: LogPolicy::Always,
+            source: LogSource::Both,
+          })),
+      );
+    }
+
+    (bitcoin_handle, bitcoin_port, monero_handle, monero_port)
+  };
+
   for i in 0 .. VALIDATORS {
     let name = match i {
       0 => "Alice",
@@ -56,7 +96,6 @@ pub(crate) async fn new_test(test_body: impl TestBody) {
 
     let (coord_key, message_queue_keys, message_queue_composition) = message_queue_instance();
 
-    let (bitcoin_composition, bitcoin_port) = network_instance(ExternalNetworkId::Bitcoin);
     let mut bitcoin_processor_composition = processor_instance(
       name,
       ExternalNetworkId::Bitcoin,
@@ -67,19 +106,18 @@ pub(crate) async fn new_test(test_body: impl TestBody) {
     assert_eq!(bitcoin_processor_composition.len(), 1);
     let bitcoin_processor_composition = bitcoin_processor_composition.swap_remove(0);
 
-    let (monero_composition, monero_port) = network_instance(ExternalNetworkId::Monero);
     let mut monero_processor_composition = processor_instance(
       name,
       ExternalNetworkId::Monero,
       monero_port,
-      message_queue_keys[&NetworkId::Monero],
-    ExternalNetworkId
+      message_queue_keys[&ExternalNetworkId::Monero],
+    )
     .0;
     assert_eq!(monero_processor_composition.len(), 1);
     let monero_processor_composition = monero_processor_composition.swap_remove(0);
 
     let coordinator_composition = coordinator_instance(name, coord_key);
-    let serai_composition = serai_composition(name, false);
+    let serai_composition = serai_composition(name);
 
     // Give every item in this stack a unique ID
     // Uses a Mutex as we can't generate a 8-byte random ID without hitting hostname length limits
@@ -96,9 +134,7 @@ pub(crate) async fn new_test(test_body: impl TestBody) {
     let mut handles = HashMap::new();
     for (name, composition) in [
       ("message_queue", message_queue_composition),
-      ("bitcoin", bitcoin_composition),
       ("bitcoin_processor", bitcoin_processor_composition),
-      ("monero", monero_composition),
       ("monero_processor", monero_processor_composition),
       ("coordinator", coordinator_composition),
       ("serai", serai_composition),
@@ -124,9 +160,9 @@ pub(crate) async fn new_test(test_body: impl TestBody) {
 
     let handles = Handles {
       message_queue: handles.remove("message_queue").unwrap(),
-      bitcoin: (handles.remove("bitcoin").unwrap(), bitcoin_port),
+      bitcoin: (bitcoin_handle.clone(), bitcoin_port),
       bitcoin_processor: handles.remove("bitcoin_processor").unwrap(),
-      monero: (handles.remove("monero").unwrap(), monero_port),
+      monero: (monero_handle.clone(), monero_port),
       monero_processor: handles.remove("monero_processor").unwrap(),
       serai: handles.remove("serai").unwrap(),
     };

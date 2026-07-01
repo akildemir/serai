@@ -14,10 +14,10 @@ pub fn message_queue(
   ethereum_key: <Ristretto as WrappedGroup>::G,
   monero_key: <Ristretto as WrappedGroup>::G,
 ) {
-  let setup = mimalloc(Os::Alpine, network.release()) +
+  let setup = mimalloc(Os::Debian, network.release()) +
     &build_serai_service(
       "",
-      Os::Alpine,
+      Os::Debian,
       network.release(),
       network.db(),
       "serai-message-queue-server",
@@ -48,7 +48,7 @@ CMD {env_vars_str} serai-message-queue-server
 "#
   );
 
-  let run = os(Os::Alpine, network.release(), "", "messagequeue") + &run_message_queue;
+  let run = os(Os::Debian, network.release(), "", "messagequeue") + &run_message_queue;
   let res = setup + &run;
 
   let mut message_queue_path = orchestration_path.to_path_buf();

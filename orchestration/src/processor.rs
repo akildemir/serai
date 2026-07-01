@@ -18,6 +18,7 @@ pub fn processor(
   substrate_evrf_key: Zeroizing<Vec<u8>>,
   network_evrf_key: Zeroizing<Vec<u8>>,
 ) {
+  let package = format!("serai-{coin}-processor");
   let setup = mimalloc(Os::Debian, network.release()) +
     &build_serai_service(
       if coin == "ethereum" {
@@ -31,8 +32,8 @@ RUN svm use 0.8.34
       },
       Os::Debian,
       network.release(),
-      &format!("binaries {} {coin}", network.db()),
-      "serai-processor",
+      network.db(),
+      &package,
     );
 
   const ADDITIONAL_ROOT: &str = r#"
@@ -80,11 +81,11 @@ RUN apt install -y ca-certificates
   let run_processor = format!(
     r#"
 # Copy the Processor binary and relevant license
-COPY --from=builder --chown=processor /serai/bin/serai-processor /bin/
+COPY --from=builder --chown=processor /serai/bin/{package} /bin/
 COPY --from=builder --chown=processor /serai/AGPL-3.0 .
 
 # Run processor
-CMD {env_vars_str} serai-processor
+CMD {env_vars_str} {package}
 "#
   );
 

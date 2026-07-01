@@ -135,7 +135,7 @@ EOF
   )
   .unwrap();
 
-  let setup = mimalloc(Os::Alpine, true) + &download_bitcoin;
+  let setup = mimalloc(Os::Debian, true) + &download_bitcoin;
 
   let run_bitcoin = format!(
     r#"
@@ -152,7 +152,7 @@ CMD ["/run.sh"]
     network.label()
   );
 
-  let run = os(Os::Alpine, true, "", "bitcoin") + &run_bitcoin;
+  let run = os(Os::Debian, true, "", "bitcoin") + &run_bitcoin;
   let res = setup + &run;
 
   let mut bitcoin_path = orchestration_path.to_path_buf();

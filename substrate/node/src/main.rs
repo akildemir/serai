@@ -252,7 +252,7 @@ fn main() {
         let dev_key_seed = (match identity.as_str() {
           "alice" => sp_keyring::sr25519::Keyring::Alice,
           "bob" => sp_keyring::sr25519::Keyring::Bob,
-          "claire" => sp_keyring::sr25519::Keyring::Charlie,
+          "charlie" => sp_keyring::sr25519::Keyring::Charlie,
           "dave" => sp_keyring::sr25519::Keyring::Dave,
           _ => panic!(r#"unrecognized identity: "{identity}""#),
         })
@@ -290,6 +290,7 @@ fn main() {
       Some((validator_identity, keystore))
     } else if let Some(seed) = &dev_key_seed {
       let pair = Pair::from_string(seed, None).expect("dev key had invalid seed");
+      // TODO: Why not just pair.public()?
       let validator_identity = chain_spec::validator_identity_for_dev_seed(seed);
       Some((validator_identity, Keystore::from(pair)))
     } else {

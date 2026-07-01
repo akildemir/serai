@@ -4,7 +4,7 @@ use std::path::Path;
 use crate::{Network, Os, mimalloc, write_dockerfile};
 
 pub fn monero(orchestration_path: &Path, network: Network) {
-  let os = Os::Alpine;
+  let os = Os::Debian;
 
   const MONERO_VERSION: &str = "0.18.5.0";
 
