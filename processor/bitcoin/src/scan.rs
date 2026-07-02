@@ -32,7 +32,13 @@ pub(crate) static OFFSETS: LazyLock<HashMap<OutputType, <Secp256k1 as WrappedGro
 
 pub(crate) fn scanner(key: <Secp256k1 as WrappedGroup>::G) -> Scanner {
   let mut scanner = Scanner::new(key).unwrap();
-  for offset in OFFSETS.values() {
+  for (kind, offset) in OFFSETS.iter() {
+    // `Scanner::new` already registers the base key, which is the `External` output type (whose
+    // offset is zero). Re-registering it here makes `register_offset` return `None` and we panic.
+    // So we just skip it.
+    if *kind == OutputType::External {
+      continue;
+    }
     let () = scanner.register_offset(*offset).unwrap();
   }
   scanner
