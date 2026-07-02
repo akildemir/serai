@@ -147,9 +147,12 @@ sp_api::impl_runtime_apis! {
     fn events() -> Vec<Vec<Vec<u8>>> {
       unimplemented!("runtime is only implemented when WASM")
     }
-    fn validators_for_peering(
+    fn authority_ids_for_peering(
       network: NetworkId
     ) -> Vec<sp_authority_discovery::AuthorityId> {
+      unimplemented!("runtime is only implemented when WASM")
+    }
+    fn validators_for_peering(network: NetworkId) -> Vec<SeraiAddress> {
       unimplemented!("runtime is only implemented when WASM")
     }
     fn current_session(network: NetworkId) -> Option<Session> {

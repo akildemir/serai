@@ -43,7 +43,9 @@ sp_api::decl_runtime_apis! {
     /// events.
     fn events() -> Vec<Vec<Vec<u8>>>;
     /// The (derived) IDs for validators to use when peering.
-    fn validators_for_peering(network: NetworkId) -> Vec<sp_authority_discovery::AuthorityId>;
+    fn authority_ids_for_peering(network: NetworkId) -> Vec<sp_authority_discovery::AuthorityId>;
+    /// The validators to peer with for a network.
+    fn validators_for_peering(network: NetworkId) -> Vec<SeraiAddress>;
     /// The current session for the network.
     fn current_session(network: NetworkId) -> Option<Session>;
     /// The current stake for a network's current validator set.

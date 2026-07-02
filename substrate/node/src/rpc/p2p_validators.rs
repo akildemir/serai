@@ -27,7 +27,7 @@ pub(crate) fn module(
     // Additionally return validators found over the DHT
     let validators = client
       .runtime_api()
-      .validators_for_peering(latest_block, network)
+      .authority_ids_for_peering(latest_block, network)
       .map_err(|_| Error::Internal("couldn't get validators from the latest block"))?;
     for validator in validators {
       let mut returned_addresses = authority_discovery
@@ -78,7 +78,7 @@ pub(crate) fn module(
       .validators_for_peering(latest_block, network)
       .map_err(|_| Error::Internal("couldn't get validators from the latest block"))?
       .iter()
-      .map(|p| hex::encode(p.as_slice()))
+      .map(|p| hex::encode(p.0))
       .collect::<Vec<_>>();
 
     Ok(validators)
