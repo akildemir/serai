@@ -158,6 +158,9 @@ sp_api::impl_runtime_apis! {
     fn current_session(network: NetworkId) -> Option<Session> {
       unimplemented!("runtime is only implemented when WASM")
     }
+    fn latest_decided_session(network: NetworkId) -> Option<Session> {
+      unimplemented!("runtime is only implemented when WASM")
+    }
     fn current_stake(network: NetworkId) -> Option<Amount> {
       unimplemented!("runtime is only implemented when WASM")
     }

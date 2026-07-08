@@ -98,9 +98,11 @@ impl<D: Db, S: ScannerFeed> ContinuallyRan for ScanTask<D, S> {
 
   fn run_iteration(&mut self) -> impl Send + Future<Output = Result<bool, Self::Error>> {
     async move {
-      // Fetch the safe to scan block
+      // Fetch the safe to scan block, clamp it to latest indexed block. 
       let latest_scannable =
-        latest_scannable_block::<S>(&self.db).expect("ScanTask run before writing the start block");
+        latest_scannable_block::<S>(&self.db).expect("ScanTask run before writing the start block")
+        .min(crate::index::latest_finalized_block(&self.db).expect("ScanTask run before writing the start block"));
+
       // Fetch the next block to scan
       let next_to_scan = ScanDb::<S>::next_to_scan_for_outputs_block(&self.db)
         .expect("ScanTask run before writing the start block");
@@ -119,9 +121,12 @@ impl<D: Db, S: ScannerFeed> ContinuallyRan for ScanTask<D, S> {
 
         let latest_active_key = {
           let mut keys = keys.clone();
+          // The most recent key, used as a fallback when no key is reporting yet. This occurs at
+          // genesis, when the only multisig is still within its ActiveYetNotReporting window.
+          let most_recent_key = keys.last().expect("scanning with no active keys").key;
           loop {
             // Use the most recent key
-            let key = keys.pop().unwrap();
+            let Some(key) = keys.pop() else { break most_recent_key };
             // Unless this key is active, but not yet reporting
             if key.stage == LifetimeStage::ActiveYetNotReporting {
               continue;

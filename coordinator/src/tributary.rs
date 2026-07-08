@@ -1,4 +1,4 @@
-use core::{future::Future, time::Duration};
+use core::{future::Future, time::Duration, ops::Deref};
 use std::sync::Arc;
 
 use zeroize::Zeroizing;
@@ -10,7 +10,7 @@ use tokio::sync::mpsc;
 
 use serai_db::{Get, DbTxn, Db as DbTrait, create_db, db_channel};
 
-use serai_client_serai::abi::primitives::validator_sets::ExternalValidatorSet;
+use serai_client_serai::abi::primitives::{validator_sets::ExternalValidatorSet, address::SeraiAddress};
 
 use tributary_sdk::{
   TransactionKind, TransactionError, ProvidedError, TransactionTrait as _, Tributary,
@@ -542,9 +542,10 @@ pub(crate) async fn spawn_tributary<P: P2p>(
   );
 
   // Spawn the scan task
+  let our_validator = SeraiAddress((Ristretto::generator() * serai_key.deref()).compress().0);
   let (scan_tributary_task_def, scan_tributary_task) = Task::new();
   tokio::spawn(
-    ScanTributaryTask::<_, P>::new(tributary_db.clone(), set.clone(), reader)
+    ScanTributaryTask::<_, P>::new(tributary_db.clone(), set.clone(), our_validator, reader)
       // This is the only handle for this TributaryProcessorMessagesTask, so when this task is
       // dropped, it will be too
       .continually_run(scan_tributary_task_def, vec![scan_tributary_messages_task]),

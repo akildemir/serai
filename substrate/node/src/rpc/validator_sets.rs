@@ -20,6 +20,20 @@ pub(crate) fn module(
   )?;
 
   module.register_method(
+    "validator-sets/latest_decided_session",
+    |params, client, _ext| -> Result<_, Error> {
+      let Some(block_hash) = block_hash(client, &params)? else {
+        Err(Error::InvalidStateReference)?
+      };
+      let network = network(&params)?;
+      let Ok(session) = client.runtime_api().latest_decided_session(block_hash, network) else {
+        Err(Error::Internal("couldn't fetch the session for the requested network"))?
+      };
+      Ok(session.map(|session| session.0))
+    },
+  )?;
+
+  module.register_method(
     "validator-sets/current_stake",
     |params, client, _ext| -> Result<_, Error> {
       let Some(block_hash) = block_hash(client, &params)? else {

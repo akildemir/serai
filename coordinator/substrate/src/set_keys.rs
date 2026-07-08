@@ -41,19 +41,19 @@ impl<D: Db> ContinuallyRan for SetKeysTask<D> {
         // This uses the latest finalized block, not the latest cosigned block, which should be
         // fine as in the worst case, the only impact is no longer attempting TX publication
         let serai = self.serai.state().await.map_err(|e| format!("{e:?}"))?;
-        let current_session =
-          serai.current_session(network.into()).await.map_err(|e| format!("{e:?}"))?;
-        let current_session = current_session.map(|session| session.0);
+        let latest_decided_session =
+          serai.latest_decided_session(network.into()).await.map_err(|e| format!("{e:?}"))?;
+        let latest_decided_session = latest_decided_session.map(|session| session.0);
         // Only attempt to set these keys if this isn't a retired session
-        if Some(session.0) < current_session {
+        if Some(session.0) < latest_decided_session {
           // Commit the txn to take these keys from the database and not try it again later
           txn.commit();
           continue;
         }
 
-        if Some(session.0) != current_session {
+        if Some(session.0) != latest_decided_session {
           // We already checked the current session wasn't greater, and they're not equal
-          assert!(current_session < Some(session.0));
+          assert!(latest_decided_session < Some(session.0));
           // This would mean the Serai node is resyncing and is behind where it prior was
           Err("have a keys for a session Serai has yet to start".to_owned())?;
         }

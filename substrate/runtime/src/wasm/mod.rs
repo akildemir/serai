@@ -480,6 +480,9 @@ sp_api::impl_runtime_apis! {
     fn current_session(network: NetworkId) -> Option<Session> {
       ValidatorSets::current_session(network)
     }
+    fn latest_decided_session(network: NetworkId) -> Option<Session> {
+      ValidatorSets::latest_decided_session(network)
+    }
     fn current_stake(network: NetworkId) -> Option<Amount> {
       ValidatorSets::stake_for_current_validator_set(network)
     }

@@ -84,6 +84,8 @@ impl<D: Db, S: ScannerFeed> ContinuallyRan for SlashReportSignerTask<D, S> {
         txn.commit();
       }
 
+      // TODO: why no retire() call?
+
       // Handle any messages sent to us
       loop {
         let mut txn = self.db.txn();
@@ -101,10 +103,10 @@ impl<D: Db, S: ScannerFeed> ContinuallyRan for SlashReportSignerTask<D, S> {
           }
           Response::Signature { id, signature } => {
             assert_eq!(id, VariantSignId::SlashReport);
-            // Drain the channel
-            let slash_report = SlashReport::try_recv(&mut txn, self.session).unwrap();
-            // Send the signature
-            SignedSlashReport::send(&mut txn, self.session, &(slash_report, signature.into()));
+            if let Some(slash_report) = SlashReport::try_recv(&mut txn, self.session) {
+              // Send the signature
+              SignedSlashReport::send(&mut txn, self.session, &(slash_report, signature.into()));
+            }
           }
         }
 

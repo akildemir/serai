@@ -138,6 +138,7 @@ struct ScanBlock<'a, TD: Db, TDT: DbTxn, P: P2p> {
   tributary_txn: &'a mut TDT,
   set: &'a NewSetInformation,
   validators: &'a [SeraiAddress],
+  our_validator: &'a SeraiAddress,
   total_weight: u16,
   validator_weights: &'a HashMap<SeraiAddress, u16>,
 }
@@ -192,6 +193,7 @@ impl<TD: Db, TDT: DbTxn, P: P2p> ScanBlock<'_, TD, TDT, P> {
     topic: Topic,
     data: &D,
     signer: SeraiAddress,
+    our_validator: &SeraiAddress,
   ) -> Option<(SignId, HashMap<Participant, Vec<u8>>)> {
     assert!(
       matches!(topic, Topic::DkgConfirmation { .. }),
@@ -205,6 +207,7 @@ impl<TD: Db, TDT: DbTxn, P: P2p> ScanBlock<'_, TD, TDT, P> {
       block_number,
       topic,
       signer,
+      our_validator,
       self.validator_weights[&signer],
       data,
     ) {
@@ -280,6 +283,7 @@ impl<TD: Db, TDT: DbTxn, P: P2p> ScanBlock<'_, TD, TDT, P> {
           block_number,
           topic.unwrap(),
           signer,
+          self.our_validator,
           self.validator_weights[&signer],
           &(),
         ) {
@@ -312,7 +316,7 @@ impl<TD: Db, TDT: DbTxn, P: P2p> ScanBlock<'_, TD, TDT, P> {
         let signer = signer(signed);
 
         let Some((id, data_set)) =
-          self.accumulate_dkg_confirmation(block_number, topic, &preprocess, signer)
+          self.accumulate_dkg_confirmation(block_number, topic, &preprocess, signer, self.our_validator)
         else {
           return;
         };
@@ -328,7 +332,7 @@ impl<TD: Db, TDT: DbTxn, P: P2p> ScanBlock<'_, TD, TDT, P> {
         let signer = signer(signed);
 
         let Some((id, data_set)) =
-          self.accumulate_dkg_confirmation(block_number, topic, &share, signer)
+          self.accumulate_dkg_confirmation(block_number, topic, &share, signer, self.our_validator)
         else {
           return;
         };
@@ -426,6 +430,7 @@ impl<TD: Db, TDT: DbTxn, P: P2p> ScanBlock<'_, TD, TDT, P> {
           block_number,
           topic.unwrap(),
           signer,
+          self.our_validator,
           self.validator_weights[&signer],
           &slash_points,
         ) {
@@ -535,6 +540,7 @@ impl<TD: Db, TDT: DbTxn, P: P2p> ScanBlock<'_, TD, TDT, P> {
           block_number,
           topic,
           signer,
+          self.our_validator,
           self.validator_weights[&signer],
           &data,
         ) {
@@ -612,6 +618,7 @@ pub struct ScanTributaryTask<TD: Db, P: P2p> {
   tributary_db: TD,
   set: NewSetInformation,
   validators: Vec<SeraiAddress>,
+  our_validator: SeraiAddress,
   total_weight: u16,
   validator_weights: HashMap<SeraiAddress, u16>,
   tributary: TributaryReader<TD, Transaction>,
@@ -625,6 +632,7 @@ impl<TD: Db, P: P2p> ScanTributaryTask<TD, P> {
   pub fn new(
     tributary_db: TD,
     set: NewSetInformation,
+    our_validator: SeraiAddress,
     tributary: TributaryReader<TD, Transaction>,
   ) -> Self {
     assert_eq!(
@@ -646,6 +654,7 @@ impl<TD: Db, P: P2p> ScanTributaryTask<TD, P> {
       tributary_db,
       set,
       validators,
+      our_validator,
       total_weight,
       validator_weights,
       tributary,
@@ -690,6 +699,7 @@ impl<TD: Db, P: P2p> ContinuallyRan for ScanTributaryTask<TD, P> {
           tributary_txn: &mut tributary_txn,
           set: &self.set,
           validators: &self.validators,
+          our_validator: &self.our_validator,
           total_weight: self.total_weight,
           validator_weights: &self.validator_weights,
         })

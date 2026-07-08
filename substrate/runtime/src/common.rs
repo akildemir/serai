@@ -48,6 +48,8 @@ sp_api::decl_runtime_apis! {
     fn validators_for_peering(network: NetworkId) -> Vec<SeraiAddress>;
     /// The current session for the network.
     fn current_session(network: NetworkId) -> Option<Session>;
+    /// The latest decided session for the network.
+    fn latest_decided_session(network: NetworkId) -> Option<Session>;
     /// The current stake for a network's current validator set.
     fn current_stake(network: NetworkId) -> Option<Amount>;
     /// The key pair for an external validator set.

@@ -127,6 +127,19 @@ impl State<'_> {
     )
   }
 
+  /// The latest decided session for the specified network.
+  pub async fn latest_decided_session(&self, network: NetworkId) -> Result<Option<Session>, RpcError> {
+    Ok(
+      self
+        .call::<Option<_>>(
+          "validator-sets/latest_decided_session",
+          &format!(r#", "network": {} "#, rpc_network(network)),
+        )
+        .await?
+        .map(Session),
+    )
+  }
+
   /// The stake for the current validators for the specified network.
   pub async fn current_stake(&self, network: NetworkId) -> Result<Option<Amount>, RpcError> {
     Ok(

@@ -7782,6 +7782,7 @@ dependencies = [
  "serai-db",
  "serai-processor-messages",
  "serai-task",
+ "sp-core",
 ]
 
 [[package]]

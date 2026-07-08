@@ -168,10 +168,13 @@ impl<D: Db> ContinuallyRan for EphemeralEventStream<D> {
 
           // We only coordinate over external networks
           let Ok(set) = ExternalValidatorSet::try_from(*set) else { continue };
-          let validators = validators
+          let mut validators = validators
             .iter()
             .map(|(validator, weight)| (*validator, u16::from(*weight)))
             .collect::<Vec<_>>();
+
+          // Sort according to what the node expect the order to be.
+          validators.sort_by_key(|(a, _)| sp_core::blake2_128(&a.0));
 
           let in_set = validators.iter().any(|(validator, _)| *validator == self.validator);
           if in_set {
