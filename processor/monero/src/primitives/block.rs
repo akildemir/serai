@@ -8,12 +8,10 @@ use monero_wallet::{
   GuaranteedScanner,
 };
 
-use serai_client_monero::Address;
-
 use primitives::{ReceivedOutput, EventualityTracker};
 use crate::{
   EXTERNAL_SUBADDRESS, BRANCH_SUBADDRESS, CHANGE_SUBADDRESS, FORWARDED_SUBADDRESS, view_pair,
-  output::Output, transaction::Eventuality,
+  address::Address, output::Output, transaction::Eventuality,
 };
 
 #[derive(Clone, Debug)]
