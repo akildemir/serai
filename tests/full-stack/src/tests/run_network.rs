@@ -7,10 +7,10 @@ use crate::tests::{*, RPC_USER, RPC_PASS};
 async fn run_local_network() {
   new_test(async move |ops, handles: Vec<Handles>| {
     // ensure the network is up
-    let _ = handles[0].serai(&ops).await;
+    let serai = handles[0].serai(&ops).await;
 
     // serai validator names
-    let names = ["Alice", "Bob", "Charlie", "Dave", "Eve", "Ferdie"];
+    let names = ["Alice", "Bob", "Charlie", "Dave"];
 
     println!();
     println!("===================== Serai local network is up =====================");
@@ -34,6 +34,10 @@ async fn run_local_network() {
     }
     println!("=====================================================================");
     println!("Network running..");
+
+    // Complete the genesis liquidity period (waits for BTC/XMR genesis deposits, forges the
+    // ETH/DAI genesis liquidity, then oraclizes the values, initializing the pools)
+    genesis::complete_genesis(&serai).await;
 
     // Wait forever
     tokio::time::sleep(Duration::from_secs(u64::MAX)).await;

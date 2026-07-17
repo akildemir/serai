@@ -19,6 +19,8 @@ use instances::*;
 mod run_network;
 // contains the copied functions from other modules.
 mod instances;
+// completes the genesis liquidity period (oraclizing values once deposits arrive)
+mod genesis;
 
 pub(crate) const VALIDATORS: usize = 4;
 // pub(crate) const THRESHOLD: usize = ((VALIDATORS * 2) / 3) + 1;
