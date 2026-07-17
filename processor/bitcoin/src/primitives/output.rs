@@ -1,12 +1,10 @@
 use std::io;
 
-use ciphersuite::*;
+use ciphersuite::{group::GroupEncoding as _, *};
 use ciphersuite_kp256::Secp256k1;
 
 use bitcoin_serai::{
-  bitcoin::{
-    hashes::Hash as _, consensus::Encodable as _, script::Instruction, transaction::Transaction,
-  },
+  bitcoin::{hashes::Hash as _, consensus::Encodable as _, transaction::Transaction},
   wallet::ReceivedOutput as WalletOutput,
 };
 
@@ -22,10 +20,7 @@ use serai_client_bitcoin::Address;
 
 use primitives::{OutputType, ReceivedOutput};
 
-use crate::{
-  primitives::x_coord_to_even_point,
-  scan::{OFFSETS, presumed_origin, extract_serai_data},
-};
+use crate::scan::{OFFSETS, presumed_origin, extract_serai_data};
 
 #[derive(Clone, PartialEq, Eq, Hash, Debug, BorshSerialize, BorshDeserialize)]
 pub(crate) struct OutputId([u8; 36]);
@@ -48,18 +43,26 @@ impl AsMut<[u8]> for OutputId {
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub(crate) struct Output {
   kind: OutputType,
+  // The root key this output was scanned for.
+  key: <Secp256k1 as WrappedGroup>::G,
   presumed_origin: Option<Address>,
   pub(crate) output: WalletOutput,
   data: Vec<u8>,
 }
 
 impl Output {
-  pub(crate) fn new(getter: &impl Get, tx: &Transaction, output: WalletOutput) -> Self {
+  pub(crate) fn new(
+    getter: &impl Get,
+    tx: &Transaction,
+    output: WalletOutput,
+    key: <Secp256k1 as WrappedGroup>::G,
+  ) -> Self {
     Self {
       kind: OFFSETS
         .iter()
         .find_map(|(kind, offset)| (offset == &output.offset()).then_some(*kind))
         .expect("scanned output for unknown offset"),
+      key,
       presumed_origin: presumed_origin(getter, tx),
       output,
       data: extract_serai_data(tx),
@@ -70,12 +73,14 @@ impl Output {
     tx: &Transaction,
     presumed_origin: Option<Address>,
     output: WalletOutput,
+    key: <Secp256k1 as WrappedGroup>::G,
   ) -> Self {
     Self {
       kind: OFFSETS
         .iter()
         .find_map(|(kind, offset)| (offset == &output.offset()).then_some(*kind))
         .expect("scanned output for unknown offset"),
+      key,
       presumed_origin,
       output,
       data: extract_serai_data(tx),
@@ -104,19 +109,7 @@ impl ReceivedOutput<<Secp256k1 as WrappedGroup>::G, Address> for Output {
   }
 
   fn key(&self) -> <Secp256k1 as WrappedGroup>::G {
-    // We read the key from the script pubkey so we don't have to independently store it
-    let script = &self.output.output().script_pubkey;
-
-    // These assumptions are safe since it's an output we successfully scanned
-    assert!(script.is_p2tr());
-    let Instruction::PushBytes(key) = script.instructions_minimal().last().unwrap().unwrap() else {
-      panic!("last item in v1 Taproot script wasn't bytes")
-    };
-    let key = x_coord_to_even_point(key.as_ref())
-      .expect("last item in scanned v1 Taproot script wasn't a valid x-only public key");
-
-    // The output's key minus the output's offset is the root key
-    key - (<Secp256k1 as WrappedGroup>::G::GENERATOR * self.output.offset())
+    self.key
   }
 
   fn presumed_origin(&self) -> Option<Address> {
@@ -133,6 +126,7 @@ impl ReceivedOutput<<Secp256k1 as WrappedGroup>::G, Address> for Output {
 
   fn write<W: io::Write>(&self, writer: &mut W) -> io::Result<()> {
     self.kind.write(writer)?;
+    writer.write_all(self.key.to_bytes().as_ref())?;
     let presumed_origin: Option<ExternalAddress> = self.presumed_origin.clone().map(Into::into);
     presumed_origin.serialize(writer)?;
     self.output.write(writer)?;
@@ -143,6 +137,7 @@ impl ReceivedOutput<<Secp256k1 as WrappedGroup>::G, Address> for Output {
   fn read<R: io::Read>(mut reader: &mut R) -> io::Result<Self> {
     Ok(Output {
       kind: OutputType::read(reader)?,
+      key: Secp256k1::read_G(reader)?,
       presumed_origin: {
         Option::<ExternalAddress>::deserialize_reader(&mut reader)
           .map_err(|e| io::Error::other(format!("couldn't decode ExternalAddress: {e:?}")))?

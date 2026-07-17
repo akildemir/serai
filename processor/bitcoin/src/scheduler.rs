@@ -186,6 +186,7 @@ impl<D: Db> TransactionPlanner<Rpc<D>, EffectedReceivedOutputs<Rpc<D>>> for Plan
                 // We still provide an accurate value to ensure a lack of discrepancies
                 Some(Address::new(inputs[0].output.output().script_pubkey.clone()).unwrap()),
                 output,
+                key,
               ));
             }
             res
