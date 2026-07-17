@@ -19,6 +19,12 @@ git clone https://github.com/microsoft/mimalloc
 cd mimalloc
 git checkout {MIMALLOC_VERSION}
 
+# DELETE ME: THE FOLLOWING FIX SHOULD BE TEMPORARY.
+# Fix an out-of-bounds read in _mi_strnlen, which reads s[max_len] before the
+# bounds check. This is benign normally but aborts under AddressSanitizer during
+# _mi_prim_mem_init (unix_detect_thp -> _mi_strnstr on a non-terminated buffer)
+sed -i 's/while(s\[len\] != 0 && len < max_len)/while(len < max_len \&\& s[len] != 0)/' src/libc.c
+
 # For some reason, `mimalloc` contains binary blobs in the repository, so we remove those now
 rm -rf .git ./bin
 

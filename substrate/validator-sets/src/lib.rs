@@ -433,12 +433,17 @@ mod pallet {
         assert!(keys_iter.next().is_none(), "more keys provided than networks");
       }
 
-      // Attempt sessions for all networks
-      for network in NetworkId::all() {
-        assert!(
-          Abstractions::<T>::attempt_new_session(network, true),
-          "failed to attempt a new session on genesis"
-        );
+      // Attempt the genesis session for the Serai network only.
+      assert!(
+        Abstractions::<T>::attempt_new_session(NetworkId::Serai, true),
+        "failed to attempt a new session on genesis"
+      );
+
+      // Queue the external networks genesis sessions to be decided from block 1, instead of
+      // deciding them here at genesis since genesis block time is 0 and tributary nodes takes
+      // their start time from this.
+      if let Some(network) = ExternalNetworkId::all().next() {
+        QueuedAttempts::<T>::set(Some((Session(0), network)));
       }
 
       // Immediately accept the handover for the genesis validators, for the Serai network

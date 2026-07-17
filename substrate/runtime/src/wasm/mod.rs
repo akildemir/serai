@@ -429,7 +429,7 @@ sp_api::impl_runtime_apis! {
       */
       NetworkId::all()
         .flat_map(
-          <Self as super::runtime_decl_for_serai_api::SeraiApi<Block>>::validators_for_peering
+          <Self as super::runtime_decl_for_serai_api::SeraiApi<Block>>::authority_ids_for_peering
         )
         .map(|validator| <[u8; 32]>::from(validator.into_inner()))
         .collect::<alloc::collections::BTreeSet<_>>()
@@ -445,38 +445,43 @@ sp_api::impl_runtime_apis! {
     fn events() -> Vec<Vec<Vec<u8>>> {
       Core::events()
     }
-    fn validators_for_peering(network: NetworkId) -> Vec<sp_authority_discovery::AuthorityId> {
+    fn authority_ids_for_peering(network: NetworkId) -> Vec<sp_authority_discovery::AuthorityId> {
+      Self::validators_for_peering(network)
+      .into_iter()
+      .map(|validator| {
+        match ValidatorSets::auxiliary_keys(validator, NetworkId::Serai) {
+          Some(EmbeddedEllipticCurveKeys::Serai(key)) => {
+            sp_authority_discovery::AuthorityId::from(serai_validator_sets_pallet::subkey(
+              &Public(key).into(),
+              sp_core::crypto::key_types::AUTHORITY_DISCOVERY,
+            ))
+          },
+          Some(_) => panic!("`auxiliary_keys()` returned auxiliary keys for another network"),
+          None => panic!("selected validator lacking Serai auxiliary key"),
+        }
+      })
+      .collect()
+    }
+    fn validators_for_peering(network: NetworkId) -> Vec<SeraiAddress> {
       [
         ValidatorSets::current_session(network),
         ValidatorSets::latest_decided_session(network)
       ]
-        .into_iter()
-        .filter_map(|session| {
-          session.map(|session| {
-            ValidatorSets::selected_validators(ValidatorSet { network, session })
-              .map(|(validator, _key_shares)| validator)
-          })
+      .into_iter()
+      .filter_map(|session| {
+        session.map(|session| {
+          ValidatorSets::selected_validators(ValidatorSet { network, session })
+            .map(|(validator, _key_shares)| validator)
         })
-        .flatten()
-        .map(|validator: SeraiAddress| validator.0)
-        .collect::<alloc::collections::BTreeSet<_>>()
-        .into_iter()
-        .map(|validator| {
-          match ValidatorSets::auxiliary_keys(SeraiAddress(validator), NetworkId::Serai) {
-            Some(EmbeddedEllipticCurveKeys::Serai(key)) => {
-              sp_authority_discovery::AuthorityId::from(serai_validator_sets_pallet::subkey(
-                &Public(key).into(),
-                sp_core::crypto::key_types::AUTHORITY_DISCOVERY,
-              ))
-            },
-            Some(_) => panic!("`auxiliary_keys()` returned auxiliary keys for another network"),
-            None => panic!("selected validator lacking Serai auxiliary key"),
-          }
-        })
-        .collect()
+      })
+      .flatten()
+      .collect()
     }
     fn current_session(network: NetworkId) -> Option<Session> {
       ValidatorSets::current_session(network)
+    }
+    fn latest_decided_session(network: NetworkId) -> Option<Session> {
+      ValidatorSets::latest_decided_session(network)
     }
     fn current_stake(network: NetworkId) -> Option<Amount> {
       ValidatorSets::stake_for_current_validator_set(network)

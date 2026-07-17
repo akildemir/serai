@@ -14,11 +14,12 @@ use serai_primitives::{
   coin::ExternalCoin,
   balance::{Amount, ExternalBalance},
 };
-use serai_client_monero::Address;
-
 use primitives::{OutputType, ReceivedOutput};
 
-use crate::{EXTERNAL_SUBADDRESS, BRANCH_SUBADDRESS, CHANGE_SUBADDRESS, FORWARDED_SUBADDRESS};
+use crate::{
+  EXTERNAL_SUBADDRESS, BRANCH_SUBADDRESS, CHANGE_SUBADDRESS, FORWARDED_SUBADDRESS,
+  address::Address,
+};
 
 #[derive(Clone, Copy, PartialEq, Eq, Default, Hash, Debug, BorshSerialize, BorshDeserialize)]
 pub(crate) struct OutputId(pub(crate) [u8; 32]);

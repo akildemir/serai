@@ -7782,6 +7782,7 @@ dependencies = [
  "serai-db",
  "serai-processor-messages",
  "serai-task",
+ "sp-core",
 ]
 
 [[package]]
@@ -7998,6 +7999,33 @@ dependencies = [
 ]
 
 [[package]]
+name = "serai-full-stack-tests"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "bitcoin-serai",
+ "ciphersuite 0.4.2",
+ "ciphersuite-kp256",
+ "curve25519-dalek",
+ "dalek-ff-group",
+ "dockertest",
+ "embedwards25519",
+ "hex",
+ "monero-simple-request-rpc",
+ "monero-wallet",
+ "parity-scale-codec",
+ "rand_core 0.6.4",
+ "secq256k1",
+ "serai-client-serai",
+ "serai-docker-tests",
+ "serde",
+ "serde_json",
+ "sp-core",
+ "tokio",
+ "zeroize",
+]
+
+[[package]]
 name = "serai-genesis-liquidity-pallet"
 version = "0.1.0"
 dependencies = [
@@ -8190,6 +8218,7 @@ dependencies = [
  "futures-util",
  "hex",
  "jsonrpsee",
+ "rand_chacha 0.3.1",
  "rand_core 0.6.4",
  "sc-authority-discovery",
  "sc-basic-authorship",

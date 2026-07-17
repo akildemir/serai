@@ -4,7 +4,7 @@ use std::{
   collections::{HashSet, HashMap},
 };
 
-use serai_client_serai::abi::primitives::{network_id::ExternalNetworkId, validator_sets::Session};
+use serai_client_serai::abi::primitives::{crypto::Public, network_id::ExternalNetworkId, validator_sets::Session};
 use serai_client_serai::{RpcError, Serai};
 
 use serai_task::{Task, ContinuallyRan};
@@ -60,7 +60,7 @@ impl Validators {
 
       Besides, we can't connect to historical validators, only the current validators.
     */
-    let serai = serai.borrow().state().await?;
+    let state = serai.borrow().state().await?;
 
     let mut session_changes = vec![];
     {
@@ -69,29 +69,41 @@ impl Validators {
       let mut futures = FuturesUnordered::new();
       for network in ExternalNetworkId::all() {
         let sessions = sessions.borrow();
+        let state = state.borrow();
         let serai = serai.borrow();
         futures.push(async move {
-          let session = match serai.current_session(network.into()).await {
-            Ok(Some(session)) => session,
-            Ok(None) => return Ok(None),
-            Err(e) => return Err(e),
-          };
+          let session = state.current_session(network.into()).await?;
 
-          if sessions.get(&network) == Some(&session) {
-            Ok(None)
+          // if we have a session, compare with ours.
+          if let Some(s) = session {
+            if sessions.get(&network) == Some(&s) {
+              Ok(None)
+            } else {
+              match state.current_validators(network.into()).await {
+                Ok(Some(validators)) => Ok(Some((
+                  network,
+                  s,
+                  validators
+                    .into_iter()
+                    .map(|validator| peer_id_from_public(validator.into()))
+                    .collect(),
+                ))),
+                Ok(None) => panic!("network has session yet no validators"),
+                Err(e) => Err(e),
+              }
+            }
           } else {
-            match serai.current_validators(network.into()).await {
-              Ok(Some(validators)) => Ok(Some((
+            // we don't have a session yet, retrieve validators from Serai.
+            let validators = serai.validators_for_peering(network).await?;
+            Ok(Some(
+              (
                 network,
-                session,
+                Session(0),
                 validators
                   .into_iter()
-                  .map(|validator| peer_id_from_public(validator.into()))
-                  .collect(),
-              ))),
-              Ok(None) => panic!("network has session yet no validators"),
-              Err(e) => Err(e),
-            }
+                  .map(|validator| peer_id_from_public(Public(hex::decode(validator).unwrap().try_into().unwrap())))
+                  .collect())
+            ))
           }
         });
       }

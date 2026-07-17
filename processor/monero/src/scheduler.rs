@@ -10,7 +10,6 @@ use dalek_ff_group::Ed25519;
 use monero_wallet::{ed25519::CompressedPoint, interface::prelude::*};
 
 use serai_primitives::{coin::ExternalCoin, balance::Amount};
-use serai_client_monero::Address;
 
 use primitives::{OutputType, ReceivedOutput as _, Payment};
 use scanner::{KeyFor, AddressFor, OutputFor, BlockFor};
@@ -27,24 +26,22 @@ use monero_wallet::{
 
 use crate::{
   EXTERNAL_SUBADDRESS, BRANCH_SUBADDRESS, CHANGE_SUBADDRESS, FORWARDED_SUBADDRESS, view_pair,
+  address::Address,
   transaction::{SignableTransaction, Eventuality},
   rpc::Rpc,
 };
 
 fn address_from_serai_key(key: <Ed25519 as WrappedGroup>::G, kind: OutputType) -> Address {
-  view_pair(key)
-    .address(
-      Network::Mainnet,
-      Some(match kind {
-        OutputType::External => EXTERNAL_SUBADDRESS,
-        OutputType::Branch => BRANCH_SUBADDRESS,
-        OutputType::Change => CHANGE_SUBADDRESS,
-        OutputType::Forwarded => FORWARDED_SUBADDRESS,
-      }),
-      None,
-    )
-    .try_into()
-    .expect("created address which wasn't representable")
+  Address::Internal(view_pair(key).address(
+    Network::Mainnet,
+    Some(match kind {
+      OutputType::External => EXTERNAL_SUBADDRESS,
+      OutputType::Branch => BRANCH_SUBADDRESS,
+      OutputType::Change => CHANGE_SUBADDRESS,
+      OutputType::Forwarded => FORWARDED_SUBADDRESS,
+    }),
+    None,
+  ))
 }
 
 async fn signable_transaction(

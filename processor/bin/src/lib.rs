@@ -233,9 +233,6 @@ pub async fn main_loop<
           let key =
             EncodableG(K::decode_key(key_pair.1.as_ref()).expect("invalid key set on serai"));
 
-          // Queue the key to be activated upon the next Batch
-          KeyToActivate::<KeyFor<S>>::send(txn, &key);
-
           // Set the external key, as needed by the signers
           ExternalKeyForSessionForSigners::<KeyFor<S>>::set(txn, session, &key);
 
@@ -248,6 +245,12 @@ pub async fn main_loop<
               Scanner::initialize(db_clone, feed.clone(), scheduler.clone(), start_block, key.0)
                 .await,
             );
+          } else {
+            // The first key is bootstrapped directly into the scanner, which queues it for
+            // activation at the start block.
+
+            // Queue the key to be activated upon the next Batch
+            KeyToActivate::<KeyFor<S>>::send(txn, &key);
           }
         }
         messages::substrate::CoordinatorMessage::SlashesReported { session } => {
@@ -265,7 +268,14 @@ pub async fn main_loop<
           batch,
           mut burns,
         } => {
-          let scanner = scanner.as_mut().unwrap();
+          // we receive Block messages before the first key is set(therefore before we
+          // have a scanner). we just skip the block in this case.
+          let Some(scanner) = scanner.as_mut() else {
+            assert!(batch.is_none(), "received a batch before the scanner was initialized");
+            assert!(burns.is_empty(), "received burns before the scanner was initialized");
+            txn.take().unwrap().commit();
+            continue;
+          };
 
           if let Some(batch) = batch {
             let key_to_activate =

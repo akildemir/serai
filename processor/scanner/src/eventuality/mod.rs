@@ -141,7 +141,7 @@ impl<D: Db, S: ScannerFeed, Sch: Scheduler<S>> EventualityTask<D, S, Sch> {
     let mut keys = ScannerGlobalDb::<S>::active_keys_as_of_next_to_scan_for_outputs_block(&self.db)
       .expect("scanning for a blockchain without any keys set");
     // Since the next-to-scan block is ahead of us, drop keys which have yet to actually activate
-    keys.retain(|key| block_number <= key.activation_block_number);
+    keys.retain(|key| key.activation_block_number <= block_number);
     let keys_with_stages = keys.iter().map(|key| (key.key, key.stage)).collect::<Vec<_>>();
 
     (keys, keys_with_stages)
@@ -279,9 +279,11 @@ impl<D: Db, S: ScannerFeed, Sch: Scheduler<S>> ContinuallyRan for EventualityTas
         let (keys, keys_with_stages) = self.keys_and_keys_with_stages(b);
         let latest_active_key = {
           let mut keys_with_stages = keys_with_stages.clone();
+          let most_recent_key =
+            keys_with_stages.last().expect("checking eventualities with no active keys").0;
           loop {
             // Use the most recent key
-            let (key, stage) = keys_with_stages.pop().unwrap();
+            let Some((key, stage)) = keys_with_stages.pop() else { break most_recent_key };
             // Unless this key is active, but not yet reporting
             if stage == LifetimeStage::ActiveYetNotReporting {
               continue;
@@ -516,7 +518,7 @@ impl<D: Db, S: ScannerFeed, Sch: Scheduler<S>> ContinuallyRan for EventualityTas
         }
 
         // Update the next-to-check block
-        EventualityDb::<S>::set_next_to_check_for_eventualities_block(&mut txn, next_to_check);
+        EventualityDb::<S>::set_next_to_check_for_eventualities_block(&mut txn, b + 1);
 
         // If this block was notable, update the latest-handled notable block
         if is_block_notable {

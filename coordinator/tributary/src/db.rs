@@ -445,6 +445,7 @@ impl TributaryDb {
     block_number: u64,
     topic: Topic,
     validator: SeraiAddress,
+    our_validator: &SeraiAddress,
     validator_weight: u16,
     data: &D,
   ) -> DataSet<D> {
@@ -540,7 +541,7 @@ impl TributaryDb {
           data_set.insert(*validator, data);
         }
       }
-      let participated = data_set.contains_key(&validator);
+      let participated = data_set.contains_key(&our_validator);
       match topic.participating() {
         Participating::Participated => {
           if participated {

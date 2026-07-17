@@ -1,10 +1,12 @@
 use std::time::Duration;
 
-use serai_client::Serai;
+use serai_client_serai::Serai;
+use monero_simple_request_rpc::SimpleRequestTransport;
 
 use dockertest::DockerOperations;
 
-use serai_processor_tests::{RPC_USER, RPC_PASS};
+const RPC_USER: &str = "serai";
+const RPC_PASS: &str = "seraidex";
 
 #[cfg(test)]
 mod tests;
@@ -28,8 +30,8 @@ impl Handles {
     // If the RPC server has yet to start, sleep for up to 60s until it does
     for _ in 0 .. 60 {
       tokio::time::sleep(Duration::from_secs(1)).await;
-      let Ok(client) = Serai::new(serai_rpc.clone()).await else { continue };
-      if client.latest_finalized_block_hash().await.is_err() {
+      let Ok(client) = Serai::new(serai_rpc.clone()) else { continue };
+      if client.latest_finalized_block_number().await.is_err() {
         continue;
       }
       return client;
@@ -53,9 +55,8 @@ impl Handles {
   pub async fn monero(
     &self,
     ops: &DockerOperations,
-  ) -> monero_simple_request_rpc::SimpleRequestRpc {
-    use monero_simple_request_rpc::SimpleRequestRpc;
-    use monero_wallet::rpc::Rpc;
+  ) -> monero_simple_request_rpc::prelude::MoneroDaemon<SimpleRequestTransport> {
+    use monero_simple_request_rpc::prelude::ProvidesBlockchainMeta;
 
     let rpc = ops.handle(&self.monero.0).host_port(self.monero.1).unwrap();
     let rpc = format!("http://{RPC_USER}:{RPC_PASS}@{}:{}", rpc.0, rpc.1);
@@ -63,8 +64,8 @@ impl Handles {
     // If the RPC server has yet to start, sleep for up to 60s until it does
     for _ in 0 .. 60 {
       tokio::time::sleep(Duration::from_secs(1)).await;
-      let Ok(client) = SimpleRequestRpc::new(rpc.clone()).await else { continue };
-      if client.get_height().await.is_err() {
+      let Ok(client) = SimpleRequestTransport::new(rpc.clone()).await else { continue };
+      if client.latest_block_number().await.is_err() {
         continue;
       }
       return client;

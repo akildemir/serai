@@ -11,6 +11,7 @@ use monero_wallet::{
 
 use view_keys::view_key;
 
+pub(crate) mod address;
 pub(crate) mod output;
 pub(crate) mod transaction;
 pub(crate) mod block;
