@@ -315,9 +315,13 @@ impl<TD: Db, TDT: DbTxn, P: P2p> ScanBlock<'_, TD, TDT, P> {
         let topic = topic.unwrap();
         let signer = signer(signed);
 
-        let Some((id, data_set)) =
-          self.accumulate_dkg_confirmation(block_number, topic, &preprocess, signer, self.our_validator)
-        else {
+        let Some((id, data_set)) = self.accumulate_dkg_confirmation(
+          block_number,
+          topic,
+          &preprocess,
+          signer,
+          self.our_validator,
+        ) else {
           return;
         };
 

@@ -267,7 +267,7 @@ impl<CD: DbTrait, TD: DbTrait> ContinuallyRan for ConfirmDkgTask<CD, TD> {
               )
               .unwrap();
 
-              let keys =  ThresholdKeys::<Ristretto>::new(
+              let keys = ThresholdKeys::<Ristretto>::new(
                 keys.params(),
                 keys.interpolation().clone(),
                 keys.original_secret_share().clone(),

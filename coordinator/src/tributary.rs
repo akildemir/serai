@@ -10,7 +10,9 @@ use tokio::sync::mpsc;
 
 use serai_db::{Get, DbTxn, Db as DbTrait, create_db, db_channel};
 
-use serai_client_serai::abi::primitives::{validator_sets::ExternalValidatorSet, address::SeraiAddress};
+use serai_client_serai::abi::primitives::{
+  BlockHash, validator_sets::ExternalValidatorSet, address::SeraiAddress,
+};
 
 use tributary_sdk::{
   TransactionKind, TransactionError, ProvidedError, TransactionTrait as _, Tributary,
@@ -24,12 +26,13 @@ use serai_cosign::{Faulted, CosignIntent, Cosigning};
 use serai_coordinator_substrate::{NewSetInformation, SignSlashReport};
 use serai_coordinator_tributary::{
   Topic, Transaction, ProcessorMessages, CosignIntents, RecognizedTopics, ScanTributaryTask,
+  SubstrateBlockPlans,
 };
 use serai_coordinator_p2p::P2p;
 
 use crate::{
   Db, TributaryTransactionsFromProcessorMessages, TributaryTransactionsFromDkgConfirmation,
-  RemoveParticipant, dkg_confirmation::ConfirmDkgTask,
+  RemoveParticipant, SubstrateBlockPlansToProvide, dkg_confirmation::ConfirmDkgTask,
 };
 
 create_db! {
@@ -260,6 +263,30 @@ impl<CD: DbTrait, TD: DbTrait, P: P2p> ContinuallyRan for AddTributaryTransactio
   fn run_iteration(&mut self) -> impl Send + Future<Output = Result<bool, Self::Error>> {
     async move {
       let mut made_progress = false;
+
+      // Provide the Substrate blocks, with the transaction plans they recognize
+      loop {
+        let mut txn = self.db.txn();
+        let Some((hash, plans)) = SubstrateBlockPlansToProvide::try_recv(&mut txn, self.set.set)
+        else {
+          break;
+        };
+        let hash = BlockHash(hash);
+
+        // Set the plans in the Tributary's database, as the Tributary's scanner reads them from
+        // there upon scanning the `Transaction::SubstrateBlock` we now provide. This must be
+        // committed before we provide the transaction accordingly.
+        {
+          let mut tributary_txn = self.tributary_db.txn();
+          SubstrateBlockPlans::set(&mut tributary_txn, self.set.set, hash, &plans);
+          tributary_txn.commit();
+        }
+        provide_transaction(self.set.set, &self.tributary, Transaction::SubstrateBlock { hash })
+          .await;
+
+        made_progress = true;
+        txn.commit();
+      }
 
       // Provide/add all transactions sent our way
       loop {

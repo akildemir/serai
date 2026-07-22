@@ -3,6 +3,8 @@ use std::io::{self, Read as _, Write as _};
 
 use group::GroupEncoding;
 
+use blake2::{digest::typenum::U32, Digest as _, Blake2b};
+
 use borsh::{BorshSerialize, BorshDeserialize};
 use serai_db::{Get, DbTxn, create_db, db_channel};
 
@@ -600,11 +602,18 @@ mod _public_db {
 
   use serai_db::{Get, DbTxn, create_db, db_channel};
 
+  create_db! {
+    ScannerPublic {
+      SubstrateBlockAckIndex: () -> u64,
+    }
+  }
+
   db_channel! {
     ScannerPublic {
       BatchesToSign: (key: &[u8]) -> Batch,
       AcknowledgedBatches: (key: &[u8]) -> u32,
       CompletedEventualities: (key: &[u8]) -> [u8; 32],
+      SubstrateBlockAcks: () -> messages::substrate::ProcessorMessage,
     }
   }
 }
@@ -647,5 +656,41 @@ impl<K: GroupEncoding> CompletedEventualities<K> {
   /// Receive the ID of a completed Eventuality.
   pub fn try_recv(txn: &mut impl DbTxn, key: &K) -> Option<[u8; 32]> {
     _public_db::CompletedEventualities::try_recv(txn, key.to_bytes().as_ref())
+  }
+}
+
+/// The `SubstrateBlockAck`s to forward to the coordinator.
+///
+/// These report the IDs of the transactions planned due to handling events from Substrate,
+/// enabling the coordinator to recognize their signing protocols.
+pub struct SubstrateBlockAcks;
+impl SubstrateBlockAcks {
+  pub(crate) fn send(txn: &mut impl DbTxn, plans: Vec<messages::substrate::PlanMeta>) {
+    let index = _public_db::SubstrateBlockAckIndex::get(txn).unwrap_or(0);
+    _public_db::SubstrateBlockAckIndex::set(txn, &(index + 1));
+
+    /*
+      The transactions to sign are planned by a series of events (Burns being intaked, outputs
+      being accumulated upon a block's acknowledgement, a retiring key being flushed) which all
+      validators process identically and in an identical order (as necessary for the produced
+      transactions to be signable by a threshold of validators at all). Accordingly, deriving this
+      ID from an index incremented on each planning event yields an ID consistent across all
+      validators. The coordinator solely uses it to correlate each validator's local view of the
+      plans with the `Transaction::SubstrateBlock` provided on the tributary, so it does not have
+      to be an actual Substrate block hash.
+    */
+    let mut id_preimage = b"serai-processor-scanner-substrate-block-ack".to_vec();
+    id_preimage.extend(index.to_le_bytes());
+    let block: [u8; 32] = Blake2b::<U32>::digest(&id_preimage).into();
+
+    _public_db::SubstrateBlockAcks::send(
+      txn,
+      &messages::substrate::ProcessorMessage::SubstrateBlockAck { block, plans },
+    );
+  }
+
+  /// Receive a `SubstrateBlockAck` to forward to the coordinator.
+  pub fn try_recv(txn: &mut impl DbTxn) -> Option<messages::substrate::ProcessorMessage> {
+    _public_db::SubstrateBlockAcks::try_recv(txn)
   }
 }

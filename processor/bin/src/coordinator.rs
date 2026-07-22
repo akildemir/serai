@@ -45,6 +45,10 @@ pub(crate) struct CoordinatorSend {
 }
 
 impl CoordinatorSend {
+  pub(crate) fn send_message(&mut self, msg: &messages::ProcessorMessage) {
+    self.send_internal(msg);
+  }
+
   fn send_internal(&mut self, msg: &messages::ProcessorMessage) {
     let _lock = SEND_LOCK.lock().unwrap();
     let mut txn = self.db.txn();

@@ -39,9 +39,13 @@ impl key_gen::KeyGenParams for KeyGenParams {
         .take(usize::from(params.n()))
         .map(|l| (l, -keys.original_verification_share(l)))
         .collect::<HashMap<_, _>>();
-      *keys =
-        ThresholdKeys::new(params, interpolation, negated_secret_share, negated_verification_shares)
-          .expect("negating valid keys yielded invalid keys");
+      *keys = ThresholdKeys::new(
+        params,
+        interpolation,
+        negated_secret_share,
+        negated_verification_shares,
+      )
+      .expect("negating valid keys yielded invalid keys");
     }
     assert_eq!(parity_byte(keys), 2, "group key didn't have an even y coordinate after tweaking");
 

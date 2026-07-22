@@ -18,7 +18,6 @@ use tokio::sync::mpsc;
 
 use serai_client_serai::{
   abi::primitives::{
-    BlockHash,
     crypto::{Public, ExternalKey, KeyPair},
     network_id::ExternalNetworkId,
     validator_sets::ExternalValidatorSet,
@@ -35,7 +34,7 @@ use serai_coordinator_substrate::{
   CanonicalEventStream, EphemeralEventStream, SignSlashReport, SetKeysTask, SignedBatches,
   PublishBatchTask, SlashReports, PublishSlashReportTask,
 };
-use serai_coordinator_tributary::{SigningProtocolRound, Signed, Transaction, SubstrateBlockPlans};
+use serai_coordinator_tributary::{SigningProtocolRound, Signed, Transaction};
 
 mod db;
 use db::*;
@@ -298,7 +297,6 @@ async fn handle_network(
       },
       messages::ProcessorMessage::Substrate(msg) => match msg {
         messages::substrate::ProcessorMessage::SubstrateBlockAck { block, plans } => {
-          let block = BlockHash(block);
           let mut by_session = HashMap::new();
           for plan in plans {
             by_session
@@ -308,12 +306,13 @@ async fn handle_network(
           }
           for (session, plans) in by_session {
             let set = ExternalValidatorSet { network, session };
-            SubstrateBlockPlans::set(&mut txn, set, block, &plans);
-            TributaryTransactionsFromProcessorMessages::send(
-              &mut txn,
-              set,
-              &Transaction::SubstrateBlock { hash: block },
-            );
+            /*
+              The plans must be in the Tributary's database before `Transaction::SubstrateBlock`
+              is provided (as scanning it reads them from there). Accordingly, we don't provide
+              the transaction here (where we only have the coordinator's database) but instead
+              queue both for the task which has access to the Tributary's database.
+            */
+            SubstrateBlockPlansToProvide::send(&mut txn, set, block, &plans);
           }
         }
       },
@@ -367,6 +366,8 @@ async fn main() {
       while !Cosigning::<Db>::intended_cosigns(&mut txn, to_cleanup).is_empty() {}
       // Drain the transactions to publish for this set
       while TributaryTransactionsFromProcessorMessages::try_recv(&mut txn, to_cleanup).is_some() {}
+      // Drain the Substrate blocks to provide for this set
+      while SubstrateBlockPlansToProvide::try_recv(&mut txn, to_cleanup).is_some() {}
       while TributaryTransactionsFromDkgConfirmation::try_recv(&mut txn, to_cleanup).is_some() {}
       // Drain the participants to remove for this set
       while RemoveParticipant::try_recv(&mut txn, to_cleanup).is_some() {}
