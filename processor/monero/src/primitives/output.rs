@@ -17,8 +17,7 @@ use serai_primitives::{
 use primitives::{OutputType, ReceivedOutput};
 
 use crate::{
-  EXTERNAL_SUBADDRESS, BRANCH_SUBADDRESS, CHANGE_SUBADDRESS, FORWARDED_SUBADDRESS,
-  address::Address,
+  EXTERNAL_SUBADDRESS, BRANCH_SUBADDRESS, CHANGE_SUBADDRESS, FORWARDED_SUBADDRESS, address::Address,
 };
 
 #[derive(Clone, Copy, PartialEq, Eq, Default, Hash, Debug, BorshSerialize, BorshDeserialize)]

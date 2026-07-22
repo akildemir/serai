@@ -247,7 +247,10 @@ impl Serai {
   }
 
   /// Returns the validators for peering.
-  pub async fn validators_for_peering(&self, network: ExternalNetworkId) -> Result<Vec<String>, RpcError> {
+  pub async fn validators_for_peering(
+    &self,
+    network: ExternalNetworkId,
+  ) -> Result<Vec<String>, RpcError> {
     self
       .call(
         "validators_for_peering",

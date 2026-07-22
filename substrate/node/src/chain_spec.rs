@@ -3,10 +3,7 @@ use std::{sync::Arc, fs};
 use rand_core::SeedableRng;
 use rand_chacha::ChaCha20Rng;
 use zeroize::Zeroizing;
-use ciphersuite::{
-  group::ff::PrimeField as _,
-  WrappedGroup, WithPreferredHash,
-};
+use ciphersuite::{group::ff::PrimeField as _, WrappedGroup, WithPreferredHash};
 use dalek_ff_group::Ristretto;
 use embedwards25519::Embedwards25519;
 use secq256k1::Secq256k1;
@@ -194,8 +191,8 @@ pub(super) fn solo_config() -> ChainSpec {
         insecure_account_from_name("Eve"),
         // ferryswap test account
         SeraiAddress([
-          78, 8, 16, 157, 111, 15, 126, 163, 155, 125, 161, 74, 246, 71, 181, 89, 252, 91, 42, 241,
-          182, 122, 43, 61, 42, 63, 64, 122, 199, 214, 8, 93,
+          96, 179, 105, 228, 44, 215, 87, 50, 205, 39, 90, 154, 92, 29, 4, 96, 191, 99, 226, 151,
+          249, 41, 77, 39, 53, 96, 126, 250, 146, 111, 132, 24,
         ]),
       ],
     ),

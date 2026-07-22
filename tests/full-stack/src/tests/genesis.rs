@@ -49,8 +49,8 @@ const VALIDATOR_NAMES: [&str; 4] = ["Alice", "Bob", "Charlie", "Dave"];
 
 /// The ferryswap test account, endowed in the `local` chain config.
 const FERRYSWAP_ACCOUNT: SeraiAddress = SeraiAddress([
-  78, 8, 16, 157, 111, 15, 126, 163, 155, 125, 161, 74, 246, 71, 181, 89, 252, 91, 42, 241, 182,
-  122, 43, 61, 42, 63, 64, 122, 199, 214, 8, 93,
+  96, 179, 105, 228, 44, 215, 87, 50, 205, 39, 90, 154, 92, 29, 4, 96, 191, 99, 226, 151, 249, 41,
+  77, 39, 53, 96, 126, 250, 146, 111, 132, 24,
 ]);
 
 fn insecure_pair_from_name(name: &str) -> Pair {
@@ -218,8 +218,7 @@ async fn provide_ethereum_genesis_liquidity(serai: &Serai) {
   // make a batch
   let mut external_network_block_hash = BlockHash([0; 32]);
   OsRng.fill_bytes(&mut external_network_block_hash.0);
-  let mut batch =
-    Batch::new(network, u32::try_from(0).unwrap(), external_network_block_hash);
+  let mut batch = Batch::new(network, u32::try_from(0).unwrap(), external_network_block_hash);
   for coin in ExternalNetworkId::Ethereum.coins() {
     // pick a random amount to provide
     let one_coin = 10u64.pow(coin.decimals());
@@ -234,12 +233,15 @@ async fn provide_ethereum_genesis_liquidity(serai: &Serai) {
 
   // sign & publish batch
   let signature = pair.sign(batch.publish_batch_message().as_slice());
-  publish_tx(serai, &InInstructions::execute_batch(SignedBatch { batch, signature: signature.into() }))
-    .await;
+  publish_tx(
+    serai,
+    &InInstructions::execute_batch(SignedBatch { batch, signature: signature.into() }),
+  )
+  .await;
 
   // Sanity check the batches actually credited the genesis liquidity
   let state = serai.state().await.unwrap();
-  for coin in  ExternalNetworkId::Ethereum.coins() {
+  for coin in ExternalNetworkId::Ethereum.coins() {
     assert_ne!(
       state.genesis_liquidity_supply(coin).await.unwrap().0,
       0,
@@ -293,7 +295,6 @@ pub(crate) async fn complete_genesis(serai: &Serai) {
     if (btc != 0) && (xmr != 0) {
       break;
     }
-    println!("  genesis liquidity so far: {btc} BTC sats, {xmr} XMR piconero. Waiting...");
     tokio::time::sleep(Duration::from_secs(30)).await;
   }
 

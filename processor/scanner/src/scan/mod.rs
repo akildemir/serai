@@ -98,10 +98,13 @@ impl<D: Db, S: ScannerFeed> ContinuallyRan for ScanTask<D, S> {
 
   fn run_iteration(&mut self) -> impl Send + Future<Output = Result<bool, Self::Error>> {
     async move {
-      // Fetch the safe to scan block, clamp it to latest indexed block. 
-      let latest_scannable =
-        latest_scannable_block::<S>(&self.db).expect("ScanTask run before writing the start block")
-        .min(crate::index::latest_finalized_block(&self.db).expect("ScanTask run before writing the start block"));
+      // Fetch the safe to scan block, clamp it to latest indexed block.
+      let latest_scannable = latest_scannable_block::<S>(&self.db)
+        .expect("ScanTask run before writing the start block")
+        .min(
+          crate::index::latest_finalized_block(&self.db)
+            .expect("ScanTask run before writing the start block"),
+        );
 
       // Fetch the next block to scan
       let next_to_scan = ScanDb::<S>::next_to_scan_for_outputs_block(&self.db)

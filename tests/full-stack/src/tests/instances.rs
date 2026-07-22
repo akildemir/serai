@@ -13,14 +13,13 @@ use secq256k1::Secq256k1;
 use sp_core::{Pair as _, sr25519::Pair};
 
 use dockertest::{
-  LogAction, LogPolicy, LogSource, LogOptions, StartPolicy, TestBodySpecification,
-   PullPolicy, Image
+  LogAction, LogPolicy, LogSource, LogOptions, StartPolicy, TestBodySpecification, PullPolicy,
+  Image,
 };
 
 use serai_client_serai::abi::primitives::network_id::ExternalNetworkId;
 
 use crate::{RPC_USER, RPC_PASS};
-
 
 // This is for test only.
 fn insecure_arbitrary_key_from_name<C: WithPreferredHash>(name: &str) -> C::F {
@@ -49,7 +48,10 @@ pub fn coordinator_instance(
       }),
       (
         "RUST_LOG".to_owned(),
-        "serai_coordinator=trace,".to_owned() + "serai-coordinator-libp2p-p2p=trace," + "tributary_chain=trace," + "tendermint=trace",
+        "serai_coordinator=trace,".to_owned() +
+          "serai-coordinator-libp2p-p2p=trace," +
+          "tributary_chain=trace," +
+          "tendermint=trace",
       ),
     ]
     .into(),
@@ -57,16 +59,15 @@ pub fn coordinator_instance(
 }
 
 pub fn serai_composition(name: &str) -> TestBodySpecification {
-    serai_docker_tests::build("serai".to_owned());
-    TestBodySpecification::with_image(
-      Image::with_repository("serai-dev-serai").pull_policy(PullPolicy::Never),
-    )
+  serai_docker_tests::build("serai".to_owned());
+  TestBodySpecification::with_image(
+    Image::with_repository("serai-dev-serai").pull_policy(PullPolicy::Never),
+  )
   .replace_env(
     [("SERAI_NAME".to_owned(), name.to_lowercase()), ("KEY".to_owned(), " ".to_owned())].into(),
   )
   .set_publish_all_ports(true)
 }
-
 
 #[expect(dead_code)]
 #[derive(Clone)]
@@ -82,8 +83,7 @@ pub fn processor_instance(
   message_queue_key: <Ristretto as WrappedGroup>::F,
 ) -> (Vec<TestBodySpecification>, EvrfPublicKeys) {
   let substrate_evrf_key = insecure_arbitrary_key_from_name::<Embedwards25519>(name);
-  let substrate_evrf_pub_key =
-    (Embedwards25519::generator() * substrate_evrf_key).to_bytes();
+  let substrate_evrf_pub_key = (Embedwards25519::generator() * substrate_evrf_key).to_bytes();
   let substrate_evrf_key = substrate_evrf_key.to_repr();
 
   let (network_evrf_key, network_evrf_pub_key) = match network {
@@ -191,7 +191,6 @@ pub fn network_instance(network: ExternalNetworkId) -> (TestBodySpecification, u
     ExternalNetworkId::Monero => monero_instance(),
   }
 }
-
 
 type MessageQueuePrivateKey = <Ristretto as WrappedGroup>::F;
 pub fn message_queue_instance() -> (

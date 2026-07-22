@@ -128,7 +128,10 @@ impl State<'_> {
   }
 
   /// The latest decided session for the specified network.
-  pub async fn latest_decided_session(&self, network: NetworkId) -> Result<Option<Session>, RpcError> {
+  pub async fn latest_decided_session(
+    &self,
+    network: NetworkId,
+  ) -> Result<Option<Session>, RpcError> {
     Ok(
       self
         .call::<Option<_>>(

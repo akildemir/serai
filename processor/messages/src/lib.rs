@@ -317,7 +317,12 @@ pub mod substrate {
 
   #[derive(Clone, Debug, BorshSerialize, BorshDeserialize)]
   pub enum ProcessorMessage {
-    // TODO: Have the processor send this
+    /// An acknowledgement of the transactions planned due to handling events from Substrate.
+    ///
+    /// `block` is an identifier for this batch of plans which is consistent across all
+    /// validators, not necessarily an actual Substrate block hash. The coordinator uses it to
+    /// correlate each validator's local view of the plans with the `Transaction::SubstrateBlock`
+    /// provided on the tributary, recognizing the plans' signing protocols.
     SubstrateBlockAck { block: [u8; 32], plans: Vec<PlanMeta> },
   }
 }
