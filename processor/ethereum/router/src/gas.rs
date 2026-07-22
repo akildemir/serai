@@ -362,7 +362,6 @@ impl Router {
         0,
         0,
         0,
-        0,
       );
       (gas.initial_regular_gas(), gas.floor_gas)
     };
