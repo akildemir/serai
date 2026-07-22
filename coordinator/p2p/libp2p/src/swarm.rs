@@ -31,7 +31,7 @@ use crate::{
   gossip,
 };
 
-const TIME_BETWEEN_REBUILD_PEERS: Duration = Duration::from_mins(10);
+const TIME_BETWEEN_REBUILD_PEERS: Duration = Duration::from_secs(30);
 
 /*
   `SwarmTask` handles everything we need the `Swarm` object for. The goal is to minimize the

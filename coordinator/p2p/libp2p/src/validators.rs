@@ -4,7 +4,9 @@ use std::{
   collections::{HashSet, HashMap},
 };
 
-use serai_client_serai::abi::primitives::{crypto::Public, network_id::ExternalNetworkId, validator_sets::Session};
+use serai_client_serai::abi::primitives::{
+  crypto::Public, network_id::ExternalNetworkId, validator_sets::Session,
+};
 use serai_client_serai::{RpcError, Serai};
 
 use serai_task::{Task, ContinuallyRan};
@@ -95,15 +97,16 @@ impl Validators {
           } else {
             // we don't have a session yet, retrieve validators from Serai.
             let validators = serai.validators_for_peering(network).await?;
-            Ok(Some(
-              (
-                network,
-                Session(0),
-                validators
-                  .into_iter()
-                  .map(|validator| peer_id_from_public(Public(hex::decode(validator).unwrap().try_into().unwrap())))
-                  .collect())
-            ))
+            Ok(Some((
+              network,
+              Session(0),
+              validators
+                .into_iter()
+                .map(|validator| {
+                  peer_id_from_public(Public(hex::decode(validator).unwrap().try_into().unwrap()))
+                })
+                .collect(),
+            )))
           }
         });
       }
@@ -218,8 +221,8 @@ impl UpdateValidatorsTask {
 
 impl ContinuallyRan for UpdateValidatorsTask {
   // Only run every minute, not the default of every five seconds
-  const DELAY_BETWEEN_ITERATIONS: u64 = 60;
-  const MAX_DELAY_BETWEEN_ITERATIONS: u64 = 5 * 60;
+  const DELAY_BETWEEN_ITERATIONS: u64 = 10;
+  const MAX_DELAY_BETWEEN_ITERATIONS: u64 = 30;
 
   type Error = RpcError;
 
