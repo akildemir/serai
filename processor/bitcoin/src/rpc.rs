@@ -164,7 +164,7 @@ impl<D: Db> ScannerFeed for Rpc<D> {
     async move {
       assert_eq!(coin, ExternalCoin::Bitcoin);
       // TODO
-      Ok(Amount(0))
+      Ok(Amount(20_000))
     }
   }
 }

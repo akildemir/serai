@@ -122,6 +122,8 @@ impl scheduler::SignableTransaction for SignableTransaction {
       input.write(writer)?;
     }
 
+    // The payments are read as a borsh `Vec`, which is length-prefixed, so we prefix the length.
+    writer.write_all(&u32::try_from(self.payments.len()).unwrap().to_le_bytes())?;
     for payment in &self.payments {
       (payment.0.as_script().as_bytes(), payment.1).serialize(writer)?;
     }
@@ -137,6 +139,40 @@ impl scheduler::SignableTransaction for SignableTransaction {
 
   fn sign(self, keys: ThresholdKeys<Self::Ciphersuite>) -> Self::PreprocessMachine {
     ClonableTransctionMachine(self, keys)
+  }
+}
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+
+  #[test]
+  fn signable_transaction_serialization() {
+    use scheduler::SignableTransaction as _;
+
+    // A P2TR payment, as the first transaction to exercise this serialization had
+    let p2tr_script = ScriptBuf::from_bytes([vec![0x51, 0x20], vec![0xe0; 32]].concat());
+    let p2wpkh_script = ScriptBuf::from_bytes([vec![0x00, 0x14], vec![0x01; 20]].concat());
+
+    let tx = SignableTransaction {
+      inputs: vec![],
+      payments: vec![(p2tr_script, 100_698_409), (p2wpkh_script, 10_000)],
+      change: Some(
+        Address::new(ScriptBuf::from_bytes([vec![0x51, 0x20], vec![0x02; 32]].concat())).unwrap(),
+      ),
+      fee_per_vbyte: 5,
+    };
+
+    let mut buf = vec![];
+    tx.write(&mut buf).unwrap();
+    let mut reader = buf.as_slice();
+    let read = SignableTransaction::read(&mut reader).unwrap();
+    assert!(reader.is_empty());
+
+    assert!(read.inputs.is_empty());
+    assert_eq!(read.payments, tx.payments);
+    assert_eq!(read.change, tx.change);
+    assert_eq!(read.fee_per_vbyte, tx.fee_per_vbyte);
   }
 }
 
