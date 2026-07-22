@@ -21,6 +21,8 @@ mod run_network;
 mod instances;
 // completes the genesis liquidity period (oraclizing values once deposits arrive)
 mod genesis;
+// mines blocks on the regtest Bitcoin/Monero nodes
+mod mining;
 
 pub(crate) const VALIDATORS: usize = 4;
 // pub(crate) const THRESHOLD: usize = ((VALIDATORS * 2) / 3) + 1;

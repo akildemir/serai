@@ -1,6 +1,3 @@
-use core::time::Duration;
-use std::u64;
-
 use crate::tests::{*, RPC_USER, RPC_PASS};
 
 #[tokio::test]
@@ -35,12 +32,20 @@ async fn run_local_network() {
     println!("=====================================================================");
     println!("Network running..");
 
+    // Start mining the external networks: mature the initial coinbase outputs, then a block per
+    // minute on each, forever
+    let mining_task = {
+      let ops = ops.clone();
+      let handles = handles[0].clone();
+      tokio::spawn(async move { mining::mine(&ops, &handles).await })
+    };
+
     // Complete the genesis liquidity period (waits for BTC/XMR genesis deposits, forges the
     // ETH/DAI genesis liquidity, then oraclizes the values, initializing the pools)
     genesis::complete_genesis(&serai).await;
 
-    // Wait forever
-    tokio::time::sleep(Duration::from_secs(u64::MAX)).await;
+    // The mining task never returns, so joining it keeps the network up forever
+    mining_task.await.unwrap();
   })
   .await;
 }
