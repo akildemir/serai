@@ -106,7 +106,7 @@ impl serai_core_pallet::Config for Runtime {
 }
 
 impl serai_coins_pallet::Config<CoinsInstance> for Runtime {
-  type AllowMint = serai_economic_security_pallet::CoinsInstanceAllowMint<Self>;
+  type AllowMint = serai_coins_pallet::AlwaysAllowMint;
   type AllowBurnWithInstruction = serai_signals_pallet::Pallet<Self>;
   type Weights = (); // TODO
 }
@@ -130,7 +130,7 @@ impl serai_abi::signals::Halted for NeverAllowBurnWithInstruction {
   }
 }
 impl serai_coins_pallet::Config<LiquidityTokensInstance> for Runtime {
-  type AllowMint = serai_economic_security_pallet::LiquidityTokensInstanceAllowMint<Self>;
+  type AllowMint = serai_coins_pallet::AlwaysAllowMint;
   type AllowBurnWithInstruction = NeverAllowBurnWithInstruction;
   // This does not have weights actually set as its call isn't exposed
   type Weights = ();

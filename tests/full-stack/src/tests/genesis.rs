@@ -220,9 +220,13 @@ async fn provide_ethereum_genesis_liquidity(serai: &Serai) {
   OsRng.fill_bytes(&mut external_network_block_hash.0);
   let mut batch = Batch::new(network, u32::try_from(0).unwrap(), external_network_block_hash);
   for coin in ExternalNetworkId::Ethereum.coins() {
-    // pick a random amount to provide
-    let one_coin = 10u64.pow(coin.decimals());
-    let amount = Amount(one_coin + (OsRng.next_u64() % (10 * one_coin)));
+    let amount = if coin == ExternalCoin::Ether {
+      // 1k eth
+      Amount(1000 * 10u64.pow(coin.decimals()))
+    } else {
+      // 1M Dai
+      Amount(1_000_000 * 10u64.pow(coin.decimals()))
+    };
     batch
       .push_instruction(InInstructionWithBalance {
         instruction: InInstruction::GenesisLiquidity(FERRYSWAP_ACCOUNT),

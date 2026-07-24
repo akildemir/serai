@@ -12,8 +12,11 @@ pub fn serai(
   network: Network,
   serai_key: &Zeroizing<<Ristretto as WrappedGroup>::F>,
 ) {
-  let setup = mimalloc(Os::Debian, network.release()) +
-    &build_serai_service("", Os::Debian, network.release(), "", "serai-node");
+  // The Serai node is always built with `--release`, even in dev, as debug builds are too slow to
+  // keep up with a running network
+  let release = true;
+  let setup = mimalloc(Os::Debian, release) +
+    &build_serai_service("", Os::Debian, release, "", "serai-node");
 
   let env_vars = [("KEY", hex::encode(serai_key.to_repr()))];
   let mut env_vars_str = String::new();
@@ -39,7 +42,7 @@ CMD {env_vars_str} "/run.sh"
     network.label(),
   );
 
-  let run = os(Os::Debian, network.release(), "", "serai") + &run_serai;
+  let run = os(Os::Debian, release, "", "serai") + &run_serai;
   let res = setup + &run;
 
   let mut serai_path = orchestration_path.to_path_buf();
