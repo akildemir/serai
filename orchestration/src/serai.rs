@@ -15,8 +15,8 @@ pub fn serai(
   // The Serai node is always built with `--release`, even in dev, as debug builds are too slow to
   // keep up with a running network
   let release = true;
-  let setup = mimalloc(Os::Debian, release) +
-    &build_serai_service("", Os::Debian, release, "", "serai-node");
+  let setup =
+    mimalloc(Os::Debian, release) + &build_serai_service("", Os::Debian, release, "", "serai-node");
 
   let env_vars = [("KEY", hex::encode(serai_key.to_repr()))];
   let mut env_vars_str = String::new();

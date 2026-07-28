@@ -81,7 +81,7 @@ mod pallet {
 
   // These are from `specs/Economics.md`
   pub(crate) const GENESIS_SRI: Amount = Amount(100_000_000 * 10u64.pow(Coin::Serai.decimals()));
-  pub(crate) const GENESIS_LIQUIDITY_TIME: Duration = Duration::from_secs(10);
+  pub(crate) const GENESIS_LIQUIDITY_TIME: Duration = serai_abi::primitives::constants::DAY;
   pub(crate) const GENESIS_TRICKLE_FEED: u128 =
     serai_abi::primitives::constants::DAY.checked_mul(180).unwrap().as_millis();
 

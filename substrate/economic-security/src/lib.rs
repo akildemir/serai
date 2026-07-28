@@ -83,13 +83,9 @@ mod pallet {
   pub trait Config:
     frame_system::Config
     + serai_core_pallet::Config
-    + serai_coins_pallet::Config<
-      serai_coins_pallet::CoinsInstance,
-      AllowMint = CoinsInstanceAllowMint<Self>,
-    > + serai_coins_pallet::Config<
-      serai_coins_pallet::LiquidityTokensInstance,
-      AllowMint = LiquidityTokensInstanceAllowMint<Self>,
-    > + serai_dex_pallet::Config
+    + serai_coins_pallet::Config<serai_coins_pallet::CoinsInstance>
+    + serai_coins_pallet::Config<serai_coins_pallet::LiquidityTokensInstance>
+    + serai_dex_pallet::Config
   {
     /// The validator sets pallet.
     type ValidatorSets: ValidatorSets;

@@ -32,6 +32,7 @@ use serai_client_serai::{
     genesis_liquidity::Call as GenesisLiquidityCall,
     primitives::{
       BlockHash,
+      constants::DAY,
       address::SeraiAddress,
       balance::{Amount, ExternalBalance},
       coin::ExternalCoin,
@@ -304,6 +305,31 @@ pub(crate) async fn complete_genesis(serai: &Serai) {
 
   println!("Providing ETH/DAI genesis liquidity with forged batches...");
   provide_ethereum_genesis_liquidity(serai).await;
+
+  // wait for genesis time to complete
+  {
+    const GENESIS_LIQUIDITY_TIME: Duration = DAY;
+
+    let genesis_time = Duration::from_millis(
+      serai.block_by_number(1).await.unwrap().unwrap().header.unix_time_in_millis(),
+    );
+    let end_of_genesis = genesis_time.checked_add(GENESIS_LIQUIDITY_TIME).unwrap();
+
+    let latest_time = |serai: &Serai| async {
+      let latest = serai.latest_finalized_block_number().await.unwrap();
+      Duration::from_millis(
+        serai.block_by_number(latest).await.unwrap().unwrap().header.unix_time_in_millis(),
+      )
+    };
+
+    let remaining = end_of_genesis.saturating_sub(latest_time(serai).await);
+    if !remaining.is_zero() {
+      println!("Waiting {}s for the genesis liquidity period to pass...", remaining.as_secs());
+    }
+    while latest_time(serai).await < end_of_genesis {
+      tokio::time::sleep(Duration::from_secs(30)).await;
+    }
+  }
 
   println!("Oraclizing genesis values...");
   oraclize_values(serai).await;

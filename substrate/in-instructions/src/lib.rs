@@ -662,6 +662,15 @@ mod pallet {
             external_coin_minimum,
           )?;
 
+          // transfer the minted liquidity tokens
+          let minted_liquidity =
+            LiquidityTokens::<T>::balance(in_instructions_address, external_coin);
+          LiquidityTokens::<T>::transfer(
+            RawOrigin::Signed(in_instructions_address).into(),
+            destination,
+            Balance { coin: external_coin.into(), amount: minted_liquidity },
+          )?;
+
           /*
             Transfer the rest, which will be greater than or equal to the amount requested for
             fees, to the destination.
