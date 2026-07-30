@@ -245,7 +245,7 @@ impl<D: Db, S: ScannerFeed> ContinuallyRan for ScanTask<D, S> {
                   )
                 })?);
               }
-              balance.amount.0 -= 2 * costs_to_aggregate[&balance.coin].0;
+              balance.amount.0 = balance.amount.0.saturating_sub(2 * costs_to_aggregate[&balance.coin].0);
 
               // Now, check it's still past the dust threshold
               if balance.amount.0 < S::dust(balance.coin).0 {

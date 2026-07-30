@@ -315,12 +315,12 @@ pub(crate) async fn complete_genesis(serai: &Serai) {
     );
     let end_of_genesis = genesis_time.checked_add(GENESIS_LIQUIDITY_TIME).unwrap();
 
-    let latest_time = |serai: &Serai| async {
+    async fn latest_time(serai: &Serai) -> Duration {
       let latest = serai.latest_finalized_block_number().await.unwrap();
       Duration::from_millis(
         serai.block_by_number(latest).await.unwrap().unwrap().header.unix_time_in_millis(),
       )
-    };
+    }
 
     let remaining = end_of_genesis.saturating_sub(latest_time(serai).await);
     if !remaining.is_zero() {
