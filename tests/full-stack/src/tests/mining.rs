@@ -29,7 +29,7 @@ const MONERO_MINING_ADDRESS: &str =
 const INITIAL_BLOCKS: usize = 100;
 
 /// The interval between blocks mined on each network.
-const BLOCK_INTERVAL: Duration = Duration::from_secs(10);
+const BLOCK_INTERVAL: Duration = Duration::from_secs(60);
 
 async fn mine_bitcoin_blocks(rpc: &bitcoin_serai::rpc::Rpc, count: usize) -> Result<(), String> {
   rpc
