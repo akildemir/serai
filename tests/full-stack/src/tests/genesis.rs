@@ -32,7 +32,7 @@ use serai_client_serai::{
     genesis_liquidity::Call as GenesisLiquidityCall,
     primitives::{
       BlockHash,
-      constants::DAY,
+      constants::HOUR,
       address::SeraiAddress,
       balance::{Amount, ExternalBalance},
       coin::ExternalCoin,
@@ -308,7 +308,7 @@ pub(crate) async fn complete_genesis(serai: &Serai) {
 
   // wait for genesis time to complete
   {
-    const GENESIS_LIQUIDITY_TIME: Duration = DAY;
+    const GENESIS_LIQUIDITY_TIME: Duration = HOUR.checked_mul(5).unwrap();;
 
     let genesis_time = Duration::from_millis(
       serai.block_by_number(1).await.unwrap().unwrap().header.unix_time_in_millis(),

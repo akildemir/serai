@@ -294,6 +294,10 @@ impl<S: ScannerFeed, P: TransactionPlanner<S, ()>> Scheduler<S, P> {
       TransactionsToSign::<P::SignableTransaction>::send(txn, &key, &planned.signable);
       eventualities.push(planned.eventuality);
 
+      // All of our outputs were consumed as this transaction's inputs, so remove them from the
+      // spendable set (the change output will be re-accumulated once scanned)
+      Db::<S>::set_outputs(txn, key, coin, &[]);
+
       // Now save the next layer of the tree to the database
       // We'll execute it when it appears
       Self::queue_branches(txn, key, coin, planned.effected_payments, tree.remove(0));
@@ -339,6 +343,9 @@ impl<S: ScannerFeed, P: TransactionPlanner<S, ()>> Scheduler<S, P> {
 
     TransactionsToSign::<P::SignableTransaction>::send(txn, &from, &planned.signable);
     eventualities.get_mut(&from_bytes).unwrap().push(planned.eventuality);
+
+    // All of the retiring key's outputs were consumed as this transaction's inputs
+    Db::<S>::set_outputs(txn, from, coin, &[]);
 
     Ok(())
   }
