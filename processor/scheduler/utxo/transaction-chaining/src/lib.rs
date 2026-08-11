@@ -266,6 +266,10 @@ impl<S: ScannerFeed, P: TransactionPlanner<S, EffectedReceivedOutputs<S>>> Sched
         TransactionsToSign::<P::SignableTransaction>::send(txn, &key, &planned.signable);
         eventualities.push(planned.eventuality);
 
+        // All of our outputs were consumed as this transaction's inputs, so remove them from the
+        // spendable set (the change output is re-accumulated immediately below)
+        Db::<S>::set_outputs(txn, key, coin, &[]);
+
         // We accumulate the change output, but not the branches as we'll consume them momentarily
         Self::accumulate_outputs(
           txn,
