@@ -13,7 +13,8 @@ use crate::Address;
 #[derive(Clone, BorshSerialize, BorshDeserialize)]
 pub struct Payment<A: Address> {
   address: A,
-  balance: ExternalBalance,
+  /// The balance to transfer.
+  pub balance: ExternalBalance,
 }
 
 impl<A: Address> TryFrom<OutInstructionWithBalance> for Payment<A> {

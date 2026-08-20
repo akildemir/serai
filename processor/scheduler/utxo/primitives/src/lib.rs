@@ -211,7 +211,7 @@ pub trait TransactionPlanner<S: ScannerFeed, A>: 'static + Send + Sync {
           for (i, payment) in payments.iter_mut().enumerate() {
             let per_payment_fee =
               per_payment_base_fee + u64::from(u8::from(i < payments_paying_one_atomic_unit_more));
-            payment.balance().amount.0 -= per_payment_fee;
+            payment.balance.amount.0 -= per_payment_fee;
             amortized += per_payment_fee;
           }
           assert!(amortized >= (*operating_costs_in_effect + fee));
