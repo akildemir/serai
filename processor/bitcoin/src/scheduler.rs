@@ -133,8 +133,14 @@ impl<D: Db> TransactionPlanner<Rpc<D>, EffectedReceivedOutputs<Rpc<D>>> for Plan
     change: Option<KeyFor<Rpc<D>>>,
   ) -> impl Send + Future<Output = Result<Amount, Self::EphemeralError>> {
     async move {
+      /*
+        `signable_transaction` appends a CPFP anchor output of `DUST` value to every transaction.
+        That value must be funded by the inputs, same as the miner fee, yet the generic planner
+        only amortizes what we report here. Accordingly, report the anchor's value as part of the
+        fee so the amortization leaves room for it.
+      */
       Ok(match signable_transaction::<D>(reference_block, inputs, payments, change) {
-        Ok(tx) => Amount(tx.1.needed_fee()),
+        Ok(tx) => Amount(tx.1.needed_fee() + bitcoin_serai::wallet::DUST),
         Err(
           TransactionError::NoInputs | TransactionError::NoOutputs | TransactionError::DustPayment,
         ) => panic!("malformed arguments to calculate_fee"),
@@ -145,7 +151,9 @@ impl<D: Db> TransactionPlanner<Rpc<D>, EffectedReceivedOutputs<Rpc<D>>> for Plan
           TransactionError::Overflow |
           TransactionError::TooLargeTransaction,
         ) => unreachable!(),
-        Err(TransactionError::NotEnoughFunds { fee, .. }) => Amount(fee),
+        Err(TransactionError::NotEnoughFunds { fee, .. }) => {
+          Amount(fee + bitcoin_serai::wallet::DUST)
+        }
       })
     }
   }
@@ -202,8 +210,11 @@ impl<D: Db> TransactionPlanner<Rpc<D>, EffectedReceivedOutputs<Rpc<D>>> for Plan
           TransactionError::Overflow |
           TransactionError::TooLargeTransaction,
         ) => unreachable!(),
-        Err(TransactionError::NotEnoughFunds { .. }) => {
-          panic!("plan called for a transaction without enough funds")
+        Err(TransactionError::NotEnoughFunds { inputs, payments, fee }) => {
+          panic!(
+            "plan called for a transaction without enough funds: inputs {inputs} payments \
+            {payments} fee {fee}"
+          )
         }
       }
     }
