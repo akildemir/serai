@@ -167,11 +167,13 @@ pub fn network_instance(network: ExternalNetworkId) -> (TestBodySpecification, u
   pub fn ethereum_instance() -> (TestBodySpecification, u32) {
     serai_docker_tests::build("ethereum".to_owned());
 
-    let composition = TestBodySpecification::with_image(
+    let mut composition = TestBodySpecification::with_image(
       Image::with_repository("serai-dev-ethereum").pull_policy(PullPolicy::Never),
     )
-    .set_start_policy(StartPolicy::Strict)
-    .set_publish_all_ports(true);
+    .set_start_policy(StartPolicy::Strict);
+    // Publish the RPC on a fixed host port so the browser wallet and ferryswap's services reach
+    // it at a stable address
+    composition.modify_port_map(ETH_PORT, ETH_PORT);
     (composition, ETH_PORT)
   }
 

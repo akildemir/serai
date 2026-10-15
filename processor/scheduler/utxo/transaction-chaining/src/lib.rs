@@ -404,13 +404,15 @@ impl<S: ScannerFeed, P: TransactionPlanner<S, EffectedReceivedOutputs<S>>> Sched
   type EphemeralError = P::EphemeralError;
   type SignableTransaction = P::SignableTransaction;
 
-  fn activate_key(txn: &mut impl DbTxn, key: KeyFor<S>) {
+  fn activate_key(&self, txn: &mut impl DbTxn, key: KeyFor<S>) -> KeyScopedEventualities<S> {
     for coin in S::NETWORK.coins() {
       assert!(Db::<S>::outputs(txn, key, coin).is_none());
       Db::<S>::set_outputs(txn, key, coin, &[]);
       assert!(Db::<S>::queued_payments(txn, key, coin).is_none());
       Db::<S>::set_queued_payments(txn, key, coin, &[]);
     }
+    // No transactions are required to activate a key
+    KeyScopedEventualities::<S>::new()
   }
 
   fn flush_key(

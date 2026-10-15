@@ -25,6 +25,12 @@ pub(crate) enum Action {
     nonce: u64,
     key: PublicKey,
   },
+  ConfirmKey {
+    chain_id: U256,
+    router_address: EthereumAddress,
+    nonce: u64,
+    key: PublicKey,
+  },
   Batch {
     chain_id: U256,
     router_address: EthereumAddress,
@@ -41,7 +47,9 @@ pub(crate) struct Eventuality(pub(crate) Executed);
 impl Action {
   pub(crate) fn nonce(&self) -> u64 {
     match self {
-      Action::SetKey { nonce, .. } | Action::Batch { nonce, .. } => *nonce,
+      Action::SetKey { nonce, .. } |
+      Action::ConfirmKey { nonce, .. } |
+      Action::Batch { nonce, .. } => *nonce,
     }
   }
 
@@ -49,6 +57,9 @@ impl Action {
     match self {
       Action::SetKey { chain_id, router_address, nonce, key } => {
         Router::update_serai_key_message(*chain_id, *router_address, *nonce, key)
+      }
+      Action::ConfirmKey { chain_id, router_address, nonce, key: _ } => {
+        Router::confirm_next_serai_key_message(*chain_id, *router_address, *nonce)
       }
       Action::Batch { chain_id, router_address, nonce, coin, fee, outs } => {
         Router::execute_message(
@@ -67,6 +78,9 @@ impl Action {
     Eventuality(match self {
       Self::SetKey { chain_id: _, router_address: _, nonce, key } => {
         Executed::NextSeraiKeySet { nonce: *nonce, key: key.eth_repr() }
+      }
+      Self::ConfirmKey { chain_id: _, router_address: _, nonce, key } => {
+        Executed::SeraiKeyUpdated { nonce: *nonce, key: key.eth_repr() }
       }
       Self::Batch { chain_id: _, router_address: _, nonce, .. } => {
         Executed::Batch { nonce: *nonce, message_hash: keccak256(self.message()), results: vec![] }
@@ -98,7 +112,7 @@ impl SignableTransaction for Action {
   fn read(reader: &mut impl io::Read) -> io::Result<Self> {
     let mut kind = [0xff];
     reader.read_exact(&mut kind)?;
-    if kind[0] >= 2 {
+    if kind[0] >= 3 {
       Err(io::Error::other("unrecognized Action type"))?;
     }
 
@@ -115,13 +129,17 @@ impl SignableTransaction for Action {
     let nonce = u64::from_le_bytes(nonce);
 
     Ok(match kind[0] {
-      0 => {
+      0 | 2 => {
         let mut key = [0; 32];
         reader.read_exact(&mut key)?;
         let key =
           PublicKey::from_eth_repr(key).ok_or_else(|| io::Error::other("invalid key in Action"))?;
 
-        Action::SetKey { chain_id, router_address, nonce, key }
+        if kind[0] == 0 {
+          Action::SetKey { chain_id, router_address, nonce, key }
+        } else {
+          Action::ConfirmKey { chain_id, router_address, nonce, key }
+        }
       }
       1 => {
         let coin = <_>::deserialize_reader(reader)?;
@@ -153,6 +171,13 @@ impl SignableTransaction for Action {
     match self {
       Self::SetKey { chain_id, router_address, nonce, key } => {
         writer.write_all(&[0])?;
+        writer.write_all(&chain_id.to_be_bytes::<32>())?;
+        writer.write_all(router_address.as_slice())?;
+        writer.write_all(&nonce.to_le_bytes())?;
+        writer.write_all(&key.eth_repr())
+      }
+      Self::ConfirmKey { chain_id, router_address, nonce, key } => {
+        writer.write_all(&[2])?;
         writer.write_all(&chain_id.to_be_bytes::<32>())?;
         writer.write_all(router_address.as_slice())?;
         writer.write_all(&nonce.to_le_bytes())?;

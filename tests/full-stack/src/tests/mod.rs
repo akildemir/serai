@@ -19,6 +19,8 @@ use instances::*;
 mod run_network;
 // contains the copied functions from other modules.
 mod instances;
+// bootstraps Serai's Ethereum contracts and relays the processors' Ethereum transactions
+mod ethereum;
 // completes the genesis liquidity period (oraclizing values once deposits arrive)
 mod genesis;
 // mines blocks on the regtest Bitcoin/Monero nodes
@@ -49,8 +51,8 @@ pub(crate) async fn new_test(test_body: impl TestBody) {
   let mut test = DockerTest::new().with_network(dockertest::Network::Isolated);
   let mut coordinator_compositions = vec![];
 
-  // spawn a single Bitcoin and a single Monero node, shared by every validator's processor.
-  let (bitcoin_handle, bitcoin_port, monero_handle, monero_port) = {
+  // spawn a single Bitcoin, Ethereum, and Monero node, shared by every validator's processors.
+  let (bitcoin_handle, bitcoin_port, ethereum_handle, ethereum_port, monero_handle, monero_port) = {
     let (first, unique_id) = {
       let first = *unique_id_lock == 0;
       let unique_id = *unique_id_lock;
@@ -60,14 +62,18 @@ pub(crate) async fn new_test(test_body: impl TestBody) {
     let logs_path = fresh_logs_folder(first, "full-stack");
 
     let (bitcoin_composition, bitcoin_port) = network_instance(ExternalNetworkId::Bitcoin);
+    let (ethereum_composition, ethereum_port) = network_instance(ExternalNetworkId::Ethereum);
     let (monero_composition, monero_port) = network_instance(ExternalNetworkId::Monero);
 
     let bitcoin_handle = format!("full_stack-bitcoin-{unique_id}");
+    let ethereum_handle = format!("full_stack-ethereum-{unique_id}");
     let monero_handle = format!("full_stack-monero-{unique_id}");
 
-    for (handle, composition) in
-      [(&bitcoin_handle, bitcoin_composition), (&monero_handle, monero_composition)]
-    {
+    for (handle, composition) in [
+      (&bitcoin_handle, bitcoin_composition),
+      (&ethereum_handle, ethereum_composition),
+      (&monero_handle, monero_composition),
+    ] {
       test.provide_container(
         composition
           .set_start_policy(StartPolicy::Strict)
@@ -84,7 +90,7 @@ pub(crate) async fn new_test(test_body: impl TestBody) {
       );
     }
 
-    (bitcoin_handle, bitcoin_port, monero_handle, monero_port)
+    (bitcoin_handle, bitcoin_port, ethereum_handle, ethereum_port, monero_handle, monero_port)
   };
 
   for i in 0 .. VALIDATORS {
@@ -109,6 +115,21 @@ pub(crate) async fn new_test(test_body: impl TestBody) {
     .0;
     assert_eq!(bitcoin_processor_composition.len(), 1);
     let bitcoin_processor_composition = bitcoin_processor_composition.swap_remove(0);
+
+    // The Ethereum processor is accompanied by its relayer
+    let (ethereum_processor_composition, ethereum_relayer_composition) = {
+      let mut compositions = processor_instance(
+        name,
+        ExternalNetworkId::Ethereum,
+        ethereum_port,
+        message_queue_keys[&ExternalNetworkId::Ethereum],
+      )
+      .0;
+      assert_eq!(compositions.len(), 2);
+      let relayer = compositions.swap_remove(1);
+      let processor = compositions.swap_remove(0);
+      (processor, relayer)
+    };
 
     let mut monero_processor_composition = processor_instance(
       name,
@@ -139,6 +160,10 @@ pub(crate) async fn new_test(test_body: impl TestBody) {
     for (name, composition) in [
       ("message_queue", message_queue_composition),
       ("bitcoin_processor", bitcoin_processor_composition),
+      // The processor resolves the relayer by its container name, which must fit within a DNS
+      // label (63 characters) once dockertest adds its prefix and suffix
+      ("eth_relayer", ethereum_relayer_composition),
+      ("ethereum_processor", ethereum_processor_composition),
       ("monero_processor", monero_processor_composition),
       ("coordinator", coordinator_composition),
       ("serai", serai_composition),
@@ -166,6 +191,9 @@ pub(crate) async fn new_test(test_body: impl TestBody) {
       message_queue: handles.remove("message_queue").unwrap(),
       bitcoin: (bitcoin_handle.clone(), bitcoin_port),
       bitcoin_processor: handles.remove("bitcoin_processor").unwrap(),
+      ethereum: (ethereum_handle.clone(), ethereum_port),
+      ethereum_processor: handles.remove("ethereum_processor").unwrap(),
+      ethereum_relayer: handles.remove("eth_relayer").unwrap(),
       monero: (monero_handle.clone(), monero_port),
       monero_processor: handles.remove("monero_processor").unwrap(),
       serai: handles.remove("serai").unwrap(),
@@ -177,6 +205,17 @@ pub(crate) async fn new_test(test_body: impl TestBody) {
         .inject_container_name(handles.message_queue.clone(), "MESSAGE_QUEUE_RPC");
       bitcoin_processor_composition
         .inject_container_name(handles.bitcoin.0.clone(), "NETWORK_RPC_HOSTNAME");
+    }
+
+    {
+      let ethereum_processor_composition = compositions.get_mut("ethereum_processor").unwrap();
+      ethereum_processor_composition
+        .inject_container_name(handles.message_queue.clone(), "MESSAGE_QUEUE_RPC");
+      ethereum_processor_composition
+        .inject_container_name(handles.ethereum.0.clone(), "NETWORK_RPC_HOSTNAME");
+      ethereum_processor_composition
+        .inject_container_name(handles.ethereum_relayer.clone(), "ETHEREUM_RELAYER_HOSTNAME");
+      ethereum_processor_composition.modify_env("ETHEREUM_RELAYER_PORT", "20830");
     }
 
     {

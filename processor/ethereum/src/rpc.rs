@@ -17,11 +17,10 @@ use serai_db::Db;
 
 use scanner::ScannerFeed;
 
-use ethereum_schnorr::PublicKey;
 use ethereum_router::{InInstruction as EthereumInInstruction, Executed, Router};
 
 use crate::{
-  TOKENS, ETHER_DUST, DAI_DUST, InitialSeraiKey,
+  TOKENS, ETHER_DUST, DAI_DUST,
   block::{Epoch, FullEpoch},
 };
 
@@ -87,13 +86,12 @@ impl<D: Db> ScannerFeed for Rpc<D> {
   ) -> impl Send + Future<Output = Result<u64, Self::EphemeralError>> {
     async move {
       /*
-        Because all RPC requests go through this method, we use it to ensure the Router is
-        populated throughout the entire service. While this will represent the chain as offline
-        until the Router is identified, the initial key generation won't require the chain and it's
-        fine to only allow indexing the chain once our Router is deployed.
+        The Router isn't required to read the chain's tip, and must not be. This is called to find
+        the first block to scan when the initial key is set, within the transaction setting the
+        key, so the Router (which is identified by the initial key) can't be identified here. The
+        Router is instead identified when blocks are fetched (`unchecked_block_by_number`), which
+        errors (ephemerally) until it's deployed.
       */
-      self.initialize_router().await?;
-
       let actual_number = self
         .provider
         .get_block(BlockNumberOrTag::Finalized.into())
@@ -130,9 +128,11 @@ impl<D: Db> ScannerFeed for Rpc<D> {
         ))?;
       }
 
+      // The time of an epoch is the time of its last block
+      let end_block = (number * 32) + 31;
       let header = self
         .provider
-        .get_block(BlockNumberOrTag::Number(number).into())
+        .get_block(BlockNumberOrTag::Number(end_block).into())
         .await?
         .ok_or_else(|| {
           TransportErrorKind::Custom(
@@ -207,17 +207,9 @@ impl<D: Db> ScannerFeed for Rpc<D> {
     async move {
       let epoch = self.unchecked_block_header_by_number(number).await?;
 
-      let Some(router) = Router::new(
-        self.provider.clone(),
-        &PublicKey::new(
-          InitialSeraiKey::get(&self.db).expect("fetching a block yet never confirmed a key").0,
-        )
-        .expect("initial key used by Serai wasn't representable on Ethereum"),
-      )
-      .await?
-      else {
-        Err(TransportErrorKind::Custom("router wasn't deployed on-chain yet".to_owned().into()))?
-      };
+      // This ensures the Router is populated for the scheduler by the time any block is handled
+      self.initialize_router().await?;
+      let router = self.router.get().expect("initialized the router yet it's unset").clone();
 
       async fn sync_block(
         router: Router,

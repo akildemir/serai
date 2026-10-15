@@ -280,7 +280,10 @@ pub trait Scheduler<S: ScannerFeed>: 'static + Send {
   ///
   /// This SHOULD setup any necessary database structures. This SHOULD NOT cause the new key to
   /// be used as the primary key. The multisig rotation time clearly establishes its steps.
-  fn activate_key(txn: &mut impl DbTxn, key: KeyFor<S>);
+  ///
+  /// This yields the Eventualities of any transactions planned to activate the key, which MUST be
+  /// for the key being activated.
+  fn activate_key(&self, txn: &mut impl DbTxn, key: KeyFor<S>) -> KeyScopedEventualities<S>;
 
   /// Flush all outputs within a retiring key to the new key.
   ///

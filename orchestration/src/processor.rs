@@ -26,6 +26,9 @@ pub fn processor(
 RUN cargo install svm-rs
 RUN svm install 0.8.34
 RUN svm use 0.8.34
+# `cargo install` places the `solc` shim under `/usr/local/cargo`, which the build replaces with a
+# cache mount of the base image's, so copy the compiler itself somewhere which persists
+RUN cp "$(find "$HOME/.svm" -type f -name 'solc-0.8.34' | head -n1)" /usr/local/bin/solc && solc --version
 "#
       } else {
         ""

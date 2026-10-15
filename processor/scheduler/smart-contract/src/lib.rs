@@ -19,6 +19,7 @@ use scheduler_primitives::*;
 create_db! {
   SmartContractScheduler {
     NextNonce: () -> u64,
+    InitialKeyActivated: () -> (),
   }
 }
 
@@ -26,6 +27,22 @@ create_db! {
 pub trait SmartContract<S: ScannerFeed>: 'static + Send {
   /// The type representing a signable transaction.
   type SignableTransaction: SignableTransaction;
+
+  /// The first nonce the smart contract will accept from Serai.
+  ///
+  /// Nonces consumed by the smart contract's deployment (such as setting the initial key) are
+  /// expected to be accounted for here.
+  const INITIAL_NONCE: u64;
+
+  /// Activate the initial key, if the smart contract requires an on-chain action to do so.
+  ///
+  /// This is called once, with the first nonce, before any other transaction is planned. It is
+  /// expected to return a transaction signable by the key being activated.
+  fn activate(
+    &self,
+    nonce: u64,
+    key: KeyFor<S>,
+  ) -> Option<(Self::SignableTransaction, EventualityFor<S>)>;
 
   /// Rotate from the retiring key to the new key.
   fn rotate(
@@ -71,7 +88,7 @@ impl<S: ScannerFeed, SC: Send + Sync + SmartContract<S>> Scheduler<S, SC> {
       LifetimeStage::Forwarding | LifetimeStage::Finishing => active_keys[1].0,
     };
 
-    let mut nonce = NextNonce::get(txn).unwrap_or(0);
+    let mut nonce = NextNonce::get(txn).unwrap_or(SC::INITIAL_NONCE);
     let mut eventualities = Vec::with_capacity(1);
     for (signable, eventuality) in self.smart_contract.fulfill(nonce, key, payments) {
       TransactionsToSign::<SC::SignableTransaction>::send(txn, &key, &signable);
@@ -87,7 +104,23 @@ impl<S: ScannerFeed, SC: Send + Sync + SmartContract<S>> SchedulerTrait<S> for S
   type EphemeralError = ();
   type SignableTransaction = SC::SignableTransaction;
 
-  fn activate_key(_txn: &mut impl DbTxn, _key: KeyFor<S>) {}
+  fn activate_key(&self, txn: &mut impl DbTxn, key: KeyFor<S>) -> KeyScopedEventualities<S> {
+    let mut eventualities = KeyScopedEventualities::<S>::new();
+
+    // Solely the initial key requires activation, consuming the first nonce. Rotating to further
+    // keys is handled by `flush_key`.
+    if InitialKeyActivated::get(txn).is_none() {
+      let nonce = NextNonce::get(txn).unwrap_or(SC::INITIAL_NONCE);
+      if let Some((signable, eventuality)) = self.smart_contract.activate(nonce, key) {
+        TransactionsToSign::<SC::SignableTransaction>::send(txn, &key, &signable);
+        NextNonce::set(txn, &(nonce + 1));
+        eventualities.insert(key.to_bytes().as_ref().to_vec(), vec![eventuality]);
+      }
+      InitialKeyActivated::set(txn, &());
+    }
+
+    eventualities
+  }
 
   fn flush_key(
     &self,
@@ -97,7 +130,7 @@ impl<S: ScannerFeed, SC: Send + Sync + SmartContract<S>> SchedulerTrait<S> for S
     new_key: KeyFor<S>,
   ) -> impl Send + Future<Output = Result<KeyScopedEventualities<S>, Self::EphemeralError>> {
     async move {
-      let nonce = NextNonce::get(txn).unwrap_or(0);
+      let nonce = NextNonce::get(txn).unwrap_or(SC::INITIAL_NONCE);
       let (signable, eventuality) = self.smart_contract.rotate(nonce, retiring_key, new_key);
       NextNonce::set(txn, &(nonce + 1));
       TransactionsToSign::<SC::SignableTransaction>::send(txn, &retiring_key, &signable);

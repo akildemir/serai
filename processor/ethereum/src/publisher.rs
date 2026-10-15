@@ -90,6 +90,9 @@ impl<D: Db> signers::TransactionPublisher<Transaction> for TransactionPublisher<
         Action::SetKey { chain_id: _, router_address: _, nonce: _, key } => {
           router.update_serai_key(&key, &tx.1)
         }
+        Action::ConfirmKey { chain_id: _, router_address: _, nonce: _, key: _ } => {
+          router.confirm_next_serai_key(&tx.1)
+        }
         Action::Batch { chain_id: _, router_address: _, nonce: _, coin, fee, outs } => {
           router.execute(coin, fee, OutInstructions::from(outs.as_ref()), &tx.1)
         }

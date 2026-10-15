@@ -66,6 +66,29 @@ pub(crate) struct SmartContract {
 impl<D: Db> smart_contract_scheduler::SmartContract<Rpc<D>> for SmartContract {
   type SignableTransaction = Action;
 
+  // The Router's constructor consumes nonce 0 when setting the initial key as the next key
+  const INITIAL_NONCE: u64 = 1;
+
+  // The initial key is solely set as the Router's next key by its constructor. It must be
+  // confirmed, with a signature from it, before the Router accepts `InInstruction`s or `execute`s
+  fn activate(
+    &self,
+    nonce: u64,
+    key: KeyFor<Rpc<D>>,
+  ) -> Option<(Self::SignableTransaction, EventualityFor<Rpc<D>>)> {
+    let action = Action::ConfirmKey {
+      chain_id: self.chain_id,
+      router_address: self
+        .router
+        .get()
+        .expect("scheduler activating a key before router was identified")
+        .address(),
+      nonce,
+      key: PublicKey::new(key).expect("activating an invalid key"),
+    };
+    Some((action.clone(), action.eventuality()))
+  }
+
   fn rotate(
     &self,
     nonce: u64,
@@ -258,7 +281,7 @@ impl<D: Db> smart_contract_scheduler::SmartContract<Rpc<D>> for SmartContract {
                 vec![]
               }
             }
-            Action::SetKey { .. } => unreachable!(),
+            Action::SetKey { .. } | Action::ConfirmKey { .. } => unreachable!(),
           }) {
             amount_out = amount_out.checked_add(*amount).unwrap();
           }

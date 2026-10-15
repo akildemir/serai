@@ -336,7 +336,16 @@ impl<D: Db, S: ScannerFeed, Sch: Scheduler<S>> ContinuallyRan for EventualityTas
         for key in &keys {
           // If this is the key's activation block, activate it
           if key.activation_block_number == b {
-            Sch::activate_key(&mut txn, key.key);
+            let activation_eventualities = self.scheduler.activate_key(&mut txn, key.key);
+            for eventualities_key in activation_eventualities.keys() {
+              assert_eq!(
+                eventualities_key.as_slice(),
+                key.key.to_bytes().as_ref(),
+                "activating a key planned transactions for a different key"
+              );
+            }
+            report_planned_transactions::<S>(&mut txn, &keys, &activation_eventualities);
+            intake_eventualities::<S>(&mut txn, activation_eventualities);
           }
 
           let completed_eventualities = {
