@@ -45,8 +45,7 @@ const TEST_ERC20_RUNTIME: &str =
 ///
 /// Ethereum has no block rewards to mine to an address (unlike the Bitcoin and Monero nodes), so
 /// this address's balances are set directly instead.
-// TODO: Hardcode the funded address
-pub(crate) const FUNDED_ADDRESS: Address = address!("1111111111111111111111111111111111111111");
+pub(crate) const FUNDED_ADDRESS: Address = address!("77154AaCf48Aa5d010ED0d13b756FEc07aB3d5F1");
 
 /// The amount of ETH the funded address receives.
 const FUNDED_ETH: u64 = 1000;

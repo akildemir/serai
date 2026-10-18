@@ -58,15 +58,21 @@ pub fn coordinator_instance(
   )
 }
 
-pub fn serai_composition(name: &str) -> TestBodySpecification {
+/// The host port the first validator's Serai RPC is published on. Each further validator's is
+/// published on the port after the prior's.
+pub const SERAI_RPC_PORT: u32 = 9944;
+
+pub fn serai_composition(name: &str, index: u32) -> TestBodySpecification {
   serai_docker_tests::build("serai".to_owned());
-  TestBodySpecification::with_image(
+  let mut composition = TestBodySpecification::with_image(
     Image::with_repository("serai-dev-serai").pull_policy(PullPolicy::Never),
   )
   .replace_env(
     [("SERAI_NAME".to_owned(), name.to_lowercase()), ("KEY".to_owned(), " ".to_owned())].into(),
-  )
-  .set_publish_all_ports(true)
+  );
+  // Publish the RPC on a fixed host port so it's reachable at a stable address across launches
+  composition.modify_port_map(SERAI_RPC_PORT, SERAI_RPC_PORT + index);
+  composition
 }
 
 #[expect(dead_code)]
@@ -149,17 +155,28 @@ pub fn processor_instance(
 }
 
 const BTC_PORT: u32 = 8332;
+const BTC_P2P_PORT: u32 = 8333;
 const ETH_PORT: u32 = 8545;
 const XMR_PORT: u32 = 18081;
+const XMR_P2P_PORT: u32 = 18080;
+// The Monero node's ports are published on the host as a secondary node's, as the host may run a
+// primary Monero node on the usual ones
+const XMR_HOST_PORT: u32 = 28081;
+const XMR_HOST_P2P_PORT: u32 = 28080;
 
+/*
+  Every node publishes its RPC (and P2P, where it's peered with) on a fixed host port so it's
+  reachable at a stable address across launches, instead of the random port Docker would assign.
+*/
 pub fn network_instance(network: ExternalNetworkId) -> (TestBodySpecification, u32) {
   pub fn bitcoin_instance() -> (TestBodySpecification, u32) {
     serai_docker_tests::build("bitcoin".to_owned());
 
-    let composition = TestBodySpecification::with_image(
+    let mut composition = TestBodySpecification::with_image(
       Image::with_repository("serai-dev-bitcoin").pull_policy(PullPolicy::Never),
-    )
-    .set_publish_all_ports(true);
+    );
+    composition.modify_port_map(BTC_PORT, BTC_PORT);
+    composition.modify_port_map(BTC_P2P_PORT, BTC_P2P_PORT);
 
     (composition, BTC_PORT)
   }
@@ -171,8 +188,6 @@ pub fn network_instance(network: ExternalNetworkId) -> (TestBodySpecification, u
       Image::with_repository("serai-dev-ethereum").pull_policy(PullPolicy::Never),
     )
     .set_start_policy(StartPolicy::Strict);
-    // Publish the RPC on a fixed host port so the browser wallet and ferryswap's services reach
-    // it at a stable address
     composition.modify_port_map(ETH_PORT, ETH_PORT);
     (composition, ETH_PORT)
   }
@@ -180,11 +195,12 @@ pub fn network_instance(network: ExternalNetworkId) -> (TestBodySpecification, u
   pub fn monero_instance() -> (TestBodySpecification, u32) {
     serai_docker_tests::build("monero".to_owned());
 
-    let composition = TestBodySpecification::with_image(
+    let mut composition = TestBodySpecification::with_image(
       Image::with_repository("serai-dev-monero").pull_policy(PullPolicy::Never),
     )
-    .set_start_policy(StartPolicy::Strict)
-    .set_publish_all_ports(true);
+    .set_start_policy(StartPolicy::Strict);
+    composition.modify_port_map(XMR_PORT, XMR_HOST_PORT);
+    composition.modify_port_map(XMR_P2P_PORT, XMR_HOST_P2P_PORT);
     (composition, XMR_PORT)
   }
   match network {

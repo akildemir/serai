@@ -87,7 +87,13 @@ pub(crate) async fn mine(ops: &DockerOperations, handles: &Handles) {
   );
   mine_bitcoin_blocks(&bitcoin, INITIAL_BLOCKS).await.unwrap();
   mine_ethereum_blocks(&ethereum, ETH_INITIAL_BLOCKS).await.unwrap();
-  mine_monero_blocks(&monero, INITIAL_BLOCKS).await.unwrap();
+  // The Monero node runs without `--offline` so external nodes can sync from it, yet it then
+  // refuses `generateblocks` (CORE_BUSY) until a first P2P peer connection marks it as
+  // synchronized, so retry until such a peer connects
+  while let Err(e) = mine_monero_blocks(&monero, INITIAL_BLOCKS).await {
+    println!("{e} (retrying in 15s...)");
+    tokio::time::sleep(Duration::from_secs(15)).await;
+  }
 
   println!(
     "Mining a block per interval on Bitcoin and Monero, {ETH_BLOCKS_PER_INTERVAL} on Ethereum..."

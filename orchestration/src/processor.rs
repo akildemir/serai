@@ -23,7 +23,7 @@ pub fn processor(
     &build_serai_service(
       if coin == "ethereum" {
         r#"
-RUN cargo install svm-rs
+RUN cargo install --locked svm-rs --version =0.5.24
 RUN svm install 0.8.34
 RUN svm use 0.8.34
 # `cargo install` places the `solc` shim under `/usr/local/cargo`, which the build replaces with a
